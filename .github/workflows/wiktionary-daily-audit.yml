@@ -1,0 +1,137 @@
+# Daily audit of etimo against live Wiktionary.
+#
+# This file lives on the default branch because GitHub reads `on: schedule`
+# only from there — a scheduled workflow committed to any other branch never
+# fires. Everything it touches, however, belongs to the validation branch: it
+# checks that branch out, runs against its code, and pushes the ledger back to
+# it. The default branch stays the released version, with no automated commits
+# of its own.
+name: Wiktionary daily audit
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: "Maximum number of validation cases to process"
+        required: false
+        default: "100"
+        type: string
+      rebuild_corpus:
+        description: >-
+          Replace the corpus snapshot. The snapshot is the denominator of every
+          coverage figure, so changing it makes past percentages incomparable
+          with future ones. Leave this off unless that is intended.
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: "wiktionary-daily-audit"
+  cancel-in-progress: false
+
+env:
+  VALIDATION_BRANCH: prog_validation/wikitionary-daily-audit
+  CORPUS_FILE: tools/validation/corpus_catalog.json
+  LEDGER_FILE: tools/validation/coverage-ledger.json
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the validation branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.VALIDATION_BRANCH }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Etymological chains converge, so the upper entries are requested by
+      # every word in a family. Carrying the cache between runs is what keeps
+      # a daily batch within courteous use of a free public service.
+      - name: Restore etimo cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/etimo
+          key: etimo-wiktionary-cache-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            etimo-wiktionary-cache-${{ runner.os }}-
+            etimo-wiktionary-cache-
+
+      - name: Install project and dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      # The offline suite must be green before anything is attributed to the
+      # source: a batch run against broken code reports source drift for what
+      # is plainly a regression.
+      - name: Run the offline test suite
+        run: pytest -q
+
+      - name: Build the corpus snapshot
+        if: ${{ inputs.rebuild_corpus }}
+        run: |
+          python tools/build_corpus.py \
+            --source api \
+            --output "$CORPUS_FILE" \
+            --force \
+            --progress
+
+      - name: Require an existing corpus snapshot
+        run: |
+          if [ ! -f "$CORPUS_FILE" ]; then
+            echo "::error::No corpus snapshot at $CORPUS_FILE. Run this" \
+                 "workflow once with rebuild_corpus enabled to create one."
+            exit 1
+          fi
+          python - <<'PY'
+          import json, os
+          meta = json.load(open(os.environ["CORPUS_FILE"]))["corpus_metadata"]
+          print(f"snapshot   {meta['snapshot_id']}")
+          print(f"hash       {meta['dataset_hash']}")
+          print(f"lemmas     {meta['total_corpus_lemmas']}")
+          PY
+
+      - name: Run the daily validation batch
+        run: |
+          python tools/validate_wiktionary.py \
+            --seed-file "$CORPUS_FILE" \
+            --queue-file "$LEDGER_FILE" \
+            --batch-size "${{ inputs.batch_size || '100' }}" \
+            --output-dir artifacts/wiktionary-validation \
+            --rate-limit-delay 0.5 \
+            --summary-md "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit the ledger to the validation branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Neither file exists before the first run, and `git add` on a
+          # missing path fails the step rather than skipping it.
+          for path in "$LEDGER_FILE" "$CORPUS_FILE"; do
+            [ -f "$path" ] && git add "$path"
+          done
+          if git diff --cached --quiet; then
+            echo "Ledger unchanged; nothing to commit."
+            exit 0
+          fi
+          git commit -m "chore(audit): refresh validation ledger [skip ci]"
+          git push origin "HEAD:$VALIDATION_BRANCH"
+
+      - name: Upload the validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wiktionary-validation-report
+          path: |
+            artifacts/wiktionary-validation/
+            tools/validation/corpus_catalog.json
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,0 +1,26 @@
+# Virtual environments
+.venv/
+venv/
+
+# Claude-specific files
+.claude/
+
+# Python bytecode and build artefacts
+__pycache__/
+*.py[cod]
+build/
+dist/
+*.egg-info/
+
+# Test and tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+coverage.json
+
+# Audit reports, regenerated on every run and uploaded as CI artefacts.
+# The ledger and the corpus snapshot are *not* here: those are state the
+# workflow is meant to carry forward, and they live on the validation branch.
+artifacts/
