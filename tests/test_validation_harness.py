@@ -15,6 +15,7 @@ if str(ROOT) not in sys.path:
 from etimo.models import Form, Node, Relation  # noqa: E402
 from etimo.wiktionary import DictSource, SourceError  # noqa: E402
 from tools.validate_wiktionary import (  # noqa: E402
+    _alarming,
     _check_expected_facts,
     _classify_failure,
     _classify_source_diagnostic,
@@ -485,3 +486,39 @@ class TestExpectationVocabulary:
         # The seed in the repository must always satisfy this.
         seed = Path(__file__).parents[1] / "tools" / "validation" / "sample_words.json"
         assert _load_word_list(seed)
+
+
+class TestWhatTurnsTheRunRed:
+    """Only our own defects should make the workflow fail.
+
+    The batch used to exit zero whatever happened, so a run stayed green with
+    a hundred failures in it — and GitHub notifies failed runs and nothing
+    else. The opposite mistake is worse: a red that fires on every missing
+    etymology trains whoever watches it to stop looking.
+    """
+
+    def test_a_broken_invariant_is_alarming(self):
+        assert _alarming({"failure_class": "FIDELITY_INVARIANT_VIOLATION"})
+
+    def test_a_crash_is_alarming(self):
+        assert _alarming({"failure_class": "EXECUTION_EXCEPTION"})
+
+    def test_an_expectation_failing_on_an_unchanged_page_is_alarming(self):
+        # The source said the same thing yesterday and we read it differently.
+        assert _alarming({
+            "failure_class": "EXPECTED_FACT_MISSING",
+            "diagnostic_class": "PARSER_REGRESSION",
+        })
+
+    def test_a_source_without_an_etymology_is_not_alarming(self):
+        # A third of Italian entries, and no business of ours.
+        assert not _alarming({"failure_class": "SOURCE_LIMIT"})
+
+    def test_an_entry_changed_upstream_is_not_alarming(self):
+        assert not _alarming({
+            "failure_class": "EXPECTED_FACT_MISSING",
+            "diagnostic_class": "SOURCE_DRIFT",
+        })
+
+    def test_a_network_error_is_not_alarming(self):
+        assert not _alarming({"failure_class": "TRANSIENT_NETWORK_ERROR"})

@@ -149,6 +149,34 @@ true and useless.
 
 ---
 
+## Where failures show up
+
+Four places, in descending order of how likely anyone is to look:
+
+| | |
+| --- | --- |
+| **the run turns red** | only for defects attributable to this code |
+| **Step Summary** | a table of the batch's failures, on the run's page |
+| **artifact** | the full report as JSON, kept 30 days |
+| **the ledger** | committed to the validation branch, so the history persists |
+
+The first line is what matters. GitHub notifies failed runs and nothing else,
+so a batch that always exits zero is an audit nobody reads — which is what
+this was until the question «and where will I see the failures?» was asked.
+
+**What turns the run red** is narrow on purpose: a broken structural
+invariant, an unexpected exception, or an expectation that fails while the
+page's hash is unchanged — meaning the source said the same thing yesterday
+and we read it differently.
+
+**What does not**: an entry Wiktionary has no etymology for (a third of them),
+an entry that changed upstream, a network error. Those are true, recorded, and
+visible in the summary — but they are not alarms, and a red light that fires
+on them would teach whoever watches it to stop looking. A red that is always
+on is worth less than no red at all.
+
+---
+
 ## Queue lifecycle
 
 * **Archiving** — three consecutive passes move a lemma to `archived`, freeing

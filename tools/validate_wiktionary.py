@@ -77,6 +77,33 @@ def _compute_source_hash(source_text: str | None) -> str | None:
     return hashlib.sha256(source_text.encode("utf-8")).hexdigest()
 
 
+# Failure classes that mean *this code* is at fault. A batch containing one of
+# these ends non-zero, which is the only thing that turns the workflow red and
+# reaches anybody: GitHub notifies failed runs and nothing else.
+#
+# The rest are deliberately not alarms. `SOURCE_LIMIT` says Wiktionary has no
+# etymology for a word, which is a third of Italian entries and no business of
+# ours; `SOURCE_DRIFT` says an entry changed upstream, which is what a source
+# under constant revision does; a network error says the network failed. Making
+# a run red for those would train whoever watches it to stop looking — and a
+# red that is always on is worth less than no red at all.
+_OUR_FAULT = frozenset(
+    {
+        "FIDELITY_INVARIANT_VIOLATION",
+        "EXECUTION_EXCEPTION",
+    }
+)
+
+
+def _alarming(case: dict[str, Any]) -> bool:
+    """Whether a failed case should turn the run red."""
+    if case.get("failure_class") in _OUR_FAULT:
+        return True
+    # An expectation that fails while the page is unchanged is a regression:
+    # the source said the same thing yesterday and we read it differently.
+    return case.get("diagnostic_class") == "PARSER_REGRESSION"
+
+
 def _classify_source_diagnostic(
     previous_hash: str | None,
     current_hash: str | None,
@@ -1222,6 +1249,19 @@ def main() -> int:
             indent=2,
         )
     )
+
+    alarming = [c for c in processed if c["status"] == "fail" and _alarming(c)]
+    if alarming:
+        print(
+            f"\n{len(alarming)} case(s) failed for reasons attributable to this "
+            "code, not to the source:",
+            file=sys.stderr,
+        )
+        for case in alarming:
+            reason = "; ".join(case.get("reasons", [])) or case.get("error", "")
+            label = case.get("diagnostic_class") or case["failure_class"]
+            print(f"  {case['word']} [{label}] — {reason}", file=sys.stderr)
+        return 1
 
     return 0
 
