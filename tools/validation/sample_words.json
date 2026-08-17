@@ -1,0 +1,251 @@
+[
+  {
+    "word": "cavolo",
+    "language": "it",
+    "category": "conditioned-prose",
+    "why": "The entry asserts one chain and offers two candidates under «Possibly … or …». The certain part must be the chain; the candidates must be conjectures and must not appear as links. NOTE — this case is OVERDETERMINED and must not be relied on to guard the conditioning rule: both candidates are also chronologically impossible above Late Latin, so the chronology check would keep them out of the chain even if the conditioning rule were removed entirely. What fails here when conditioning breaks is `caulis::la`, which drops out of the chain. The presidium for conditioning proper is `dipelare`, `rodomonte` and `pizza`, where chronology is silent.",
+    "manual_review": false,
+    "expected": {
+      "must_include_relations": ["derived"],
+      "must_include_forms": ["caulus::la-lat", "caulis::la"],
+      "must_include_hypotheses": ["cavolo::nap", "cavulu::scn"],
+      "must_not_include_forms": ["cavolo::nap", "cavulu::scn"]
+    }
+  },
+  {
+    "word": "dipelare",
+    "language": "it",
+    "category": "conditioned-prose",
+    "why": "«From {{af}} or from {{inh}}»: two competing analyses joined by «or». Neither may be promoted; both belong among the conjectures and no chain may be drawn. PRESIDIUM for the alternation rule: Latin above Italian is chronologically ordinary, so the chronology check stays silent and the «or» is the only thing keeping `dēpilō` out of the chain. Weakening this case leaves that rule unguarded.",
+    "manual_review": false,
+    "expected": {
+      "must_include_terminals": ["not_interpreted"],
+      "must_include_hypotheses": ["dēpilō::la", "di-::it", "pelo::it", "-are::it"],
+      "must_not_include_forms": ["dēpilō::la", "di-::it"]
+    }
+  },
+  {
+    "word": "rodomonte",
+    "language": "it",
+    "category": "conditioned-prose",
+    "why": "«apparently from {{af|it|rodo|monte}}»: the conditioning marker precedes a *formation* template, not a linear relation. The first version of the rule only covered linear relations and missed this. PRESIDIUM for conditioning over formation templates: both components are Italian, so the chronology check cannot apply at all and the marker is the sole defence.",
+    "manual_review": false,
+    "expected": {
+      "must_include_terminals": ["not_interpreted"],
+      "must_include_hypotheses": ["rodo::it", "monte::it"],
+      "must_not_include_forms": ["rodo::it", "monte::it"]
+    }
+  },
+  {
+    "word": "pizza",
+    "language": "it",
+    "category": "conditioned-prose",
+    "why": "One asserted chain plus one alternative introduced as a possibility. The alternative must be a conjecture; the chain must survive. NOTE — OVERDETERMINED, like `cavolo` but by a different pair. The entry carries two markers on the same form: «Also **possibly** from {{bor|it|lng|bizza}} (also `pizza` **or** `bizzo`)». Conditioning and alternation each keep `bizza` among the conjectures on their own, so breaking either one leaves this case green. Chronology is indeed silent here — Lombardic above Italian is an ordinary order — but that is not enough to make it a presidium. NO CLEAN PRESIDIUM EXISTS in this seed for conditioning over a *linear* relation, and the reason is in the data, not in the tests: an isolating case would need a modaliser directly before a {{der}}/{{inh}}/{{bor}} that gives a form, with no alternation, a chronologically ordinary ancestor, and a lemma rather than an inflected form. Entries checked and rejected: `banda` (form suppressed with `-`), `dipinto` and `ansa` (inflected forms, resolved to their lemma so the conditioned clause is never walked), `intronare` and `vilucchio` (marker governs a cognate), `strabiliare` (formation template, duplicates `rodomonte`). The half of the rule that actually broke — conditioning over formation templates — is guarded by `rodomonte`.",
+    "manual_review": false,
+    "expected": {
+      "must_include_relations": ["borrowed"],
+      "must_include_forms": ["pizza::nap", "πίτα::gkm"],
+      "must_include_hypotheses": ["bizza::lng"],
+      "must_not_include_forms": ["bizza::lng"]
+    }
+  },
+  {
+    "word": "brindare",
+    "language": "it",
+    "category": "negative-control",
+    "why": "NEGATIVE CONTROL. «…, probably introduced by German mercenaries in the 16th c.» — the modaliser governs a historical circumstance, not an etymon. The chain is asserted without conditions and must stay whole. A parser that demotes on any modaliser fails here and passes everything else.",
+    "manual_review": false,
+    "expected": {
+      "must_include_relations": ["borrowed"],
+      "must_include_forms": ["brindar::es"],
+      "must_not_include_terminals": ["not_interpreted", "uncertain_origin"]
+    }
+  },
+  {
+    "word": "strumentale",
+    "language": "it",
+    "category": "synchronic-analysis",
+    "why": "«{{inh+|it|la|īnstrūmentālis}}. By surface analysis, {{af|it|strumento|-ale}}». The {{surf}} template was already treated as a remark; the same sentence in prose was read as a link. The Italian components must not appear as ancestors.",
+    "manual_review": false,
+    "expected": {
+      "must_include_relations": ["inherited"],
+      "must_include_forms": ["īnstrūmentālis::la"],
+      "must_not_include_forms": ["strumento::it", "-ale::it"]
+    }
+  },
+  {
+    "word": "minigolf",
+    "language": "it",
+    "category": "synchronic-analysis",
+    "why": "«{{ubor|it|en|minigolf}}, equivalent to {{af|it|mini-|golf}}»: taken whole from English, and *mini- + golf* is how it decomposes today. The English entry's own components are legitimate ancestors; the Italian ones are not.",
+    "manual_review": false,
+    "expected": {
+      "must_include_relations": ["unadapted_borrowing"],
+      "must_include_forms": ["minigolf::en"],
+      "must_not_include_forms": ["mini-::it", "golf::it"]
+    }
+  },
+  {
+    "word": "Trebisacce",
+    "language": "it",
+    "category": "synchronic-analysis",
+    "why": "«Morphologically from {{com|it|tre|bisacce}}, however this is just a corruption of {{der|it|el|τραπεζὰκιον}}». The entry contradicts its own decomposition in the next clause. Before the fix the toponym descended from «three saddlebags».",
+    "manual_review": false,
+    "expected": {
+      "must_include_relations": ["derived"],
+      "must_include_forms": ["τραπεζὰκιον::el"],
+      "must_not_include_forms": ["tre::it", "bisacce::it"]
+    }
+  },
+  {
+    "word": "porno",
+    "language": "it",
+    "category": "divergence",
+    "why": "The Italian entry derives the Latin from the Greek compound πορνογράφος; the Latin entry composes it from πόρνη + -γραφία. A real disagreement in the literature — πορνογράφος is attested in Athenaeus, πορνογραφία is not. Both accounts must be visible; neither may be silently dropped.",
+    "manual_review": false,
+    "expected": {
+      "must_include_relations": ["clipping", "derived"],
+      "must_include_forms": ["pornografia::it", "pornographia::la", "πόρνη::grc"]
+    }
+  },
+  {
+    "word": "biglia",
+    "language": "it",
+    "category": "divergence",
+    "why": "Same shape as `porno`, opposite substance: French `bille` has two etymologies and a Medieval Latin `billia` glossed «tree-trunk» had leaked into the chain of the *ball* word. Probably an editing error in the source, not a scholarly position. The tool cannot tell the two apart and must not try — it reports what each entry says.",
+    "manual_review": false,
+    "expected": {
+      "must_include_relations": ["borrowed", "inherited"],
+      "must_include_forms": ["bille::fr", "*bikkil::frk"]
+    }
+  },
+  {
+    "word": "formaggio",
+    "language": "it",
+    "category": "carried-chain",
+    "why": "«from Old French fromage, from Late Latin formaticum, from Latin forma». The walk moves to the `fromage` page, which speaks; before the fix its own steps replaced the reserve and `fōrma` — already declared by the starting entry — was lost. The reserve is now a stack.",
+    "manual_review": false,
+    "expected": {
+      "must_include_relations": ["borrowed", "inherited", "derived"],
+      "must_include_forms": ["fromage::fro", "fōrmāticum::la-eme", "fōrma::la"]
+    }
+  },
+  {
+    "word": "obturo",
+    "language": "la",
+    "category": "carried-chain",
+    "why": "«{{af|la|ob-|*tūrō}}, the second component from {{inh|la|itc-pro|*tūrāō}}»: the continuation belongs to one branch of a compound, and which one is stated only in prose. Reading that would be interpretation, so the continuation is declared in a note and not attached to either branch. Five Italian `-atura` derivatives traverse this page.",
+    "manual_review": false,
+    "expected": {
+      "must_include_relations": ["affixation"],
+      "must_include_forms": ["ob-::la", "*tūrō::la"],
+      "must_not_include_forms": ["*tūrāō::itc-pro", "*tewh₂-::ine-pro"]
+    }
+  },
+  {
+    "word": "zucchero",
+    "language": "it",
+    "category": "language-resolution",
+    "why": "The structured format writes `pgd:𐨭𐨐𐨪`. When the code was absent from the language table the split failed and the form inherited the parent's language — a false statement about which language a form belongs to, made in silence.",
+    "manual_review": false,
+    "expected": {
+      "must_include_relations": ["borrowed"],
+      "must_include_forms": ["سُكَّر::ar", "𐨭𐨐𐨪::pgd"],
+      "must_not_include_forms": ["𐨭𐨐𐨪::pal"]
+    }
+  },
+  {
+    "word": "banale",
+    "language": "it",
+    "category": "lemma-cleaning",
+    "why": "The source writes inline annotations inside the form parameter — `*h₂el-<t:to grow><id:grow>`. Kept in the lemma they build a page title that cannot exist, so the chain closed on a false «no entry». Reached 6.3% of chains before the fix.",
+    "manual_review": false,
+    "expected": {
+      "must_include_relations": ["borrowed", "affixation"],
+      "must_include_forms": ["banal::fr", "-ālis::la"]
+    }
+  },
+  {
+    "word": "piranha",
+    "language": "it",
+    "category": "declared-limit",
+    "why": "The entry names the language and withholds the form. Distinct from «data exhausted», which claims something about the language, and from «no entry», which claims something about our reach.",
+    "manual_review": false,
+    "expected": {
+      "must_include_terminals": ["form_not_given"],
+      "must_not_include_terminals": ["data_exhausted"]
+    }
+  },
+  {
+    "word": "tintinnare",
+    "language": "it",
+    "category": "declared-limit",
+    "why": "The entry exists and records no etymology. Expressible only since `--json` began emitting the object for barren entries — before that the whole 35% of the corpus without an Etymology section was outside the reach of any expectation.",
+    "manual_review": false,
+    "expected": {
+      "must_include_terminals": ["etymology_missing"],
+      "must_not_include_terminals": ["data_exhausted", "reconstructed_root"]
+    }
+  },
+  {
+    "word": "allogliato",
+    "language": "it",
+    "category": "declared-limit",
+    "why": "Prose the parser cannot turn into a chain. The terminal must say the limit is ours (`?`), not the language's, and the entry's own words must be printed.",
+    "manual_review": false,
+    "expected": {
+      "must_include_terminals": ["not_interpreted"],
+      "must_not_include_terminals": ["data_exhausted"]
+    }
+  },
+  {
+    "word": "riso",
+    "language": "it",
+    "sense": 1,
+    "category": "homograph",
+    "why": "One spelling, two unrelated words. Sense 1 is laughter: the chain must be the Latin `rīsus` and must not leak the rice etymology.",
+    "manual_review": false,
+    "expected": {
+      "must_include_relations": ["inherited"],
+      "must_include_forms": ["rīsus::la"],
+      "must_not_include_forms": ["oryza::la-lat"]
+    }
+  },
+  {
+    "word": "riso",
+    "language": "it",
+    "sense": 3,
+    "category": "homograph",
+    "why": "Sense 3 is rice. The pair with sense 1 is what verifies that the sections are kept apart rather than merged.",
+    "manual_review": false,
+    "expected": {
+      "must_include_relations": ["inherited"],
+      "must_include_forms": ["oryza::la-lat"],
+      "must_not_include_forms": ["rīsus::la"]
+    }
+  },
+  {
+    "word": "fuoco",
+    "language": "it",
+    "category": "declared-uncertainty",
+    "why": "The chain is asserted as far as Latin `focus`, and there the source declares it does not know. A declared uncertainty is a fact about the state of knowledge, and must not be overridden by the proposals that follow it.",
+    "manual_review": false,
+    "expected": {
+      "must_include_relations": ["inherited"],
+      "must_include_forms": ["focus::la"],
+      "must_include_terminals": ["uncertain_origin"]
+    }
+  },
+  {
+    "word": "dado",
+    "language": "it",
+    "category": "declared-uncertainty",
+    "why": "«either from datum, or from aʿdād»: declared uncertainty plus two alternatives. Before the first round the two were concatenated into a chain, making Latin `datum` descend from Arabic.",
+    "manual_review": false,
+    "expected": {
+      "must_include_terminals": ["uncertain_origin"],
+      "must_include_hypotheses": ["datum::la"],
+      "must_not_include_forms": ["datum::la"]
+    }
+  }
+]
