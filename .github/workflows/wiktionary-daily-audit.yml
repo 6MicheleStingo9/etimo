@@ -99,6 +99,28 @@ jobs:
           print(f"lemmas     {meta['total_corpus_lemmas']}")
           PY
 
+      # The 21 hand-written cases are a regression suite, not corpus coverage:
+      # fixed, small, and run in full every night rather than sampled. They are
+      # the only check not derived from the parser's own tables, so a batch
+      # that skips them verifies the parser against itself. They ran zero times
+      # in the first 19 nights, because the corpus catalogue was the only file
+      # ever passed to the harness.
+      #
+      # Its ledger is separate and disposable: the corpus ledger tracks what
+      # has been covered, while this one is rebuilt from the seed each run and
+      # tracks nothing. Sharing one would let 21 permanent cases compete with
+      # 127101 lemmas for the same quotas.
+      - name: Run the hand-written expectation cases
+        run: |
+          rm -f /tmp/seed-ledger.json
+          python tools/validate_wiktionary.py \
+            --seed-file tools/validation/sample_words.json \
+            --queue-file /tmp/seed-ledger.json \
+            --batch-size 100 \
+            --output-dir artifacts/expectation-cases \
+            --rate-limit-delay 0.5 \
+            --summary-md "$GITHUB_STEP_SUMMARY"
+
       - name: Run the daily validation batch
         run: |
           python tools/validate_wiktionary.py \
@@ -132,6 +154,7 @@ jobs:
           name: wiktionary-validation-report
           path: |
             artifacts/wiktionary-validation/
+            artifacts/expectation-cases/
             tools/validation/corpus_catalog.json
           if-no-files-found: warn
           retention-days: 30

@@ -179,19 +179,45 @@ on is worth less than no red at all.
 
 ## Queue lifecycle
 
-* **Archiving** — three consecutive passes move a lemma to `archived`, freeing
-  queue capacity.
-* **Daily quotas** — each batch is allocated 40% new lemmas, 30% retries, 15%
-  manual review, 15% re-checks of expired archives.
-* **Re-audit** — archived entries carry `next_due_at` (30 days) and return to
-  `pending` afterwards, so upstream changes are noticed.
-* **Source hash** — each audited item records the raw page hash. A failure
-  with an unchanged hash is a parser regression; with a changed hash, source
-  drift.
+> **This section described three behaviours that have never happened and
+> cannot happen.** They are recorded here as they were, struck through, because
+> a document that quietly drops a false claim teaches nobody why it was false.
+> Measured on the real ledger after 19 nightly runs: 0 archived items, 0
+> `next_due_at` timestamps, every audited lemma at `attempts: 1`.
+
+* ~~**Archiving** — three consecutive passes move a lemma to `archived`~~
+* ~~**Re-audit** — archived entries carry `next_due_at` (30 days) and return
+  to `pending`, so upstream changes are noticed~~
+* ~~**Daily quotas** — 15% re-checks of expired archives~~
+
+**Why they cannot happen.** A lemma that passes is written `status: "pass"`,
+and no selector admits that status: the four pools ask for
+`{priority, pending}`, `retry`, `manual_review` and `archived`-and-due, and the
+top-up explicitly excludes `pass`. So a passed lemma is never selected again,
+`consecutive_passes` can only ever hold 0 or 1, the threshold of 3 is
+unreachable, and everything downstream of it — `archived`, `next_due_at`, the
+re-check pool and its quota — is dead by construction rather than by
+circumstance. Simulating 40 days over the real selector produces zero archived
+items.
+
+**What this costs.** The audit has no mechanism to notice that Wiktionary has
+changed on a lemma it has already seen — which is the one thing a *continuous*
+validation exists to do. The `source_hash` recorded per item is compared to
+nothing, because nothing is ever re-visited.
+
+**What still works.**
+
+* **Daily quotas** — 40% new, 30% retries, 15% manual review. The three live
+  pools are honoured; the fourth is always empty and its share is absorbed by
+  the others, so a batch is never short.
+* **Source hash** — recorded per audited item. The comparison that would use
+  it is currently unreachable, see above.
 * **Network isolation** — transient errors keep an item on `retry` without
-  penalising its priority.
+  penalising its priority. `retry` and `manual_review` are *not* absorbing:
+  those items are re-selected indefinitely, so a failing lemma is retried
+  every night. Only success is terminal.
 * **Category invalidation** — `--invalidate-category <name>` after a parser
-  fix.
+  fix. This is today the **only** way to make the audit look at a lemma twice.
 
 ---
 

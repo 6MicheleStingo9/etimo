@@ -57,6 +57,48 @@ EXCLUDED_CATEGORIES = (
 
 USER_AGENT = "etimo/validation-corpus-builder (https://en.wiktionary.org)"
 
+# Which entries can a misreading actually hurt?
+#
+# Measured on 600 random lemmas: 38.7% carry no Etymology section at all, and
+# 56.3% state their etymology purely in templates, where the parser has nothing
+# to decide — it parses and prints. The remaining **5%** is where every defect
+# ever found in this project came from: entries whose prose asks the parser to
+# judge whether a form is an ancestor, a conjecture, a synchronic remark or a
+# comparison.
+#
+# The six classes below are that 5%, split by what a misreading would produce.
+# They are searched with `insource:` rather than by downloading 127101 pages —
+# ~80 search requests instead of gigabytes of wikitext.
+#
+# THE LIMIT, which the metadata records: `insource:` matches anywhere on the
+# page, and a page holds every language that spells the word this way. A French
+# etymology saying "possibly" marks the Italian lemma too. The classification
+# is therefore an over-estimate, and the harness corrects each entry to the
+# truth when it audits it, reading the Italian section alone.
+INTERPRETIVE_CLASSES = {
+    # A false ancestor — the parser asserts what the source qualified.
+    "conditioning": r"possibly|perhaps|probably|maybe|apparently|uncertain"
+                    r"|unclear|disputed|alternatively|less likely|more likely"
+                    r"|traditionally|said to be|thought to be|may be|might be",
+    "alternation": "\\}\\}[^.]*(or|either)[^.]*\\{\\{",
+    "synchrony": r"surface analysis|synchronically|analysable as|analyzable as"
+                 r"|equivalent to|morphologically",
+    # A missing link — the parser loses what the source stated.
+    "non_ancestor": r"[Cc]ompare |[Cc]ognate|akin to|related to|whence|hence"
+                    r"|displaced|superseded|influenced by|by analogy|modelled on"
+                    r"|modeled on|not related",
+    "mediation": r"through|via|by way of|ultimately|itself from|in turn"
+                 r"|going back to",
+    "attribution": r"suggests|has been proposed|another theory|argues"
+                   r"|some scholars|posits|speculates",
+}
+
+# A misreading in the first three invents an ancestor the source never claimed;
+# in the last three it loses one the source stated. This project spent four
+# rounds establishing that the first is the grave defect and the second the
+# venial one, so the queue orders by it.
+SEVERE_CLASSES = ("conditioning", "alternation", "synchrony")
+
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -141,6 +183,65 @@ def _fetch_category_members(
     return titles
 
 
+def _search_titles(
+    query: str,
+    *,
+    api_endpoint: str = WIKTIONARY_API,
+    delay: float = 0.3,
+    cap: int = 60000,
+) -> list[str]:
+    """Every page matching a search query, following offsets to the end."""
+    titles: list[str] = []
+    offset = 0
+    while len(titles) < cap:
+        params = {
+            "action": "query", "list": "search", "srsearch": query,
+            "srlimit": "500", "sroffset": str(offset),
+            "srnamespace": "0", "format": "json",
+        }
+        request = urllib.request.Request(
+            f"{api_endpoint}?{urllib.parse.urlencode(params)}",
+            headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            if error.code == 429:
+                time.sleep(5.0)
+                continue
+            raise
+
+        batch = [p["title"] for p in payload.get("query", {}).get("search", [])]
+        titles.extend(batch)
+        offset = payload.get("continue", {}).get("sroffset", 0)
+        if not offset or not batch:
+            break
+        time.sleep(delay)
+    return titles
+
+
+def _classify_interpretive_load(
+    *, api_endpoint: str = WIKTIONARY_API, progress: bool = False
+) -> dict[str, list[str]]:
+    """Which entries ask the parser to decide something, and what kind.
+
+    One search per class rather than one page fetch per lemma. Returns a map
+    from page title to the classes it triggered — the classes matter and not
+    just the count, because they carry different consequences and the queue
+    orders by that.
+    """
+    found: dict[str, set[str]] = {}
+    for name, expression in INTERPRETIVE_CLASSES.items():
+        query = f'incategory:"Italian lemmas" insource:/{expression}/'
+        titles = _search_titles(query, api_endpoint=api_endpoint)
+        if progress:
+            print(f"  {len(titles):>6}  {name}", file=sys.stderr)
+        for title in titles:
+            found.setdefault(title, set()).add(name)
+    return {title: sorted(classes) for title, classes in found.items()}
+
+
 def _normalize_word(word: str) -> str:
     value = str(word).strip().replace(" ", " ")
     return re.sub(r"\s+", " ", value)
@@ -171,6 +272,7 @@ def build_catalog(
     max_pages: int | None = None,
     force: bool = False,
     progress: bool = False,
+    classify: bool = True,
 ) -> dict[str, Any]:
     if output_file.exists() and not force:
         existing = json.loads(output_file.read_text(encoding="utf-8"))
@@ -217,6 +319,13 @@ def build_catalog(
         (excluded if word in excluded_titles else allowed).append(word)
 
     allowed.sort(key=lambda s: s.casefold())
+
+    load: dict[str, list[str]] = {}
+    if source_mode == "api" and classify:
+        if progress:
+            print("Classifying interpretive load …", file=sys.stderr)
+        load = _classify_interpretive_load(api_endpoint=api_endpoint, progress=progress)
+
     snapshot = snapshot_id or f"corpus-{datetime.now(timezone.utc):%Y%m%d}"
 
     payload = {
@@ -231,6 +340,13 @@ def build_catalog(
             "excluded_categories": list(EXCLUDED_CATEGORIES)
             if source_mode == "api"
             else [],
+            "load_classified": bool(load),
+            "load_is_over_estimate": bool(load),
+            "load_counts": {
+                name: sum(1 for classes in load.values() if name in classes)
+                for name in INTERPRETIVE_CLASSES
+            } if load else {},
+            "load_total": len(load),
             "truncated_at": max_pages,
             "total_corpus_lemmas": len(allowed),
             "excluded_count": len(excluded),
@@ -238,8 +354,18 @@ def build_catalog(
             "generated_at": _utc_now(),
         },
         "items": [
-            {"word": word, "language": "it", "kind": "target_lemma",
-             "source": source_name}
+            {
+                "word": word,
+                "language": "it",
+                "kind": "target_lemma",
+                "source": source_name,
+                # The classes a misreading could hurt, over-estimated: see
+                # INTERPRETIVE_CLASSES. Empty means the entry states its
+                # etymology in templates or not at all, and the parser has
+                # nothing to decide. The harness replaces this with the truth
+                # when it audits the entry.
+                "load": load.get(word, []),
+            }
             for word in allowed
         ],
     }
@@ -267,6 +393,11 @@ def main() -> int:
     parser.add_argument("--force", action="store_true",
                         help="Replace an existing snapshot deliberately.")
     parser.add_argument("--progress", action="store_true")
+    parser.add_argument(
+        "--no-classify",
+        action="store_true",
+        help="Skip the interpretive-load classification (six extra searches).",
+    )
     args = parser.parse_args()
 
     catalog = build_catalog(
@@ -278,6 +409,7 @@ def main() -> int:
         max_pages=args.max_pages,
         force=args.force,
         progress=args.progress,
+        classify=not args.no_classify,
     )
     metadata = catalog["corpus_metadata"]
     print(json.dumps({
@@ -285,6 +417,8 @@ def main() -> int:
         "dataset_hash": metadata["dataset_hash"],
         "total_corpus_lemmas": metadata["total_corpus_lemmas"],
         "excluded_count": metadata["excluded_count"],
+        "interpretive_load": metadata.get("load_total", 0),
+        "load_counts": metadata.get("load_counts", {}),
         "output": str(args.output),
     }, ensure_ascii=False, indent=2))
     return 0

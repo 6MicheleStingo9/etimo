@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -26,6 +27,7 @@ from tools.validate_wiktionary import (  # noqa: E402
     _load_word_list,
     _run_single_case,
     _select_batch,
+    _utc_now,
     _verify_fidelity_invariants,
 )
 
@@ -522,3 +524,75 @@ class TestWhatTurnsTheRunRed:
 
     def test_a_network_error_is_not_alarming(self):
         assert not _alarming({"failure_class": "TRANSIENT_NETWORK_ERROR"})
+
+
+class TestPassIsNotAbsorbing:
+    """A lemma that passes must become due again, or nothing is ever re-checked.
+
+    For the first 19 nightly runs it did not. `pass` was a status no pool
+    asked for, so a passed lemma was never selected again; `consecutive_passes`
+    could only hold 0 or 1, the threshold of 3 was unreachable, and `archived`,
+    `next_due_at` and the re-check quota were dead by construction. The audit
+    therefore had no way to notice that Wiktionary had changed under a lemma it
+    had already seen — the one thing a continuous validation exists to do.
+    """
+
+    @staticmethod
+    def _queue(n, days_ago):
+        stamp = (_utc_now() - timedelta(days=days_ago)).isoformat()
+        return [
+            {
+                "word": f"w{i}", "language": "it", "status": "pass", "priority": 50,
+                "attempts": 1, "consecutive_passes": 1,
+                "last_validated": stamp, "next_due_at": None,
+            }
+            for i in range(n)
+        ]
+
+    def test_a_stale_pass_is_selected_again(self):
+        queue = self._queue(10, days_ago=40)
+        batch = _select_batch(queue, 5, revalidate_days=30)
+        assert len(batch) == 5
+        assert all(item["status"] == "pass" for item in batch)
+
+    def test_a_fresh_pass_is_left_alone(self):
+        queue = self._queue(10, days_ago=2)
+        assert _select_batch(queue, 5, revalidate_days=30) == []
+
+    def test_the_period_is_what_decides(self):
+        queue = self._queue(10, days_ago=10)
+        assert _select_batch(queue, 5, revalidate_days=30) == []
+        assert len(_select_batch(queue, 5, revalidate_days=7)) == 5
+
+    def test_an_unaudited_lemma_is_new_work_not_a_recheck(self):
+        # No last_validated means never seen: it belongs to the `new` pool, and
+        # must not be swept up as though it had gone stale.
+        queue = [{"word": "w", "language": "it", "status": "pending",
+                  "priority": 50, "attempts": 0, "consecutive_passes": 0,
+                  "last_validated": None, "next_due_at": None}]
+        batch = _select_batch(queue, 5, revalidate_days=30)
+        assert [i["word"] for i in batch] == ["w"]
+        assert batch[0]["status"] == "pending"
+
+    def test_the_lifecycle_reaches_archived_over_time(self):
+        # The property that never held: run the real selector over simulated
+        # days and check that an item can accumulate three passes.
+        start = _utc_now() - timedelta(days=30)
+        queue = [{"word": f"w{i}", "language": "it", "status": "pending",
+                  "priority": 50, "attempts": 0, "consecutive_passes": 0,
+                  "last_validated": None, "next_due_at": None}
+                 for i in range(200)]
+        for day in range(30):
+            today = start + timedelta(days=day)
+            for item in _select_batch(queue, 20, revalidate_days=5):
+                item["attempts"] += 1
+                item["consecutive_passes"] += 1
+                item["last_validated"] = today.isoformat()
+                if item["consecutive_passes"] >= 3:
+                    item["status"] = "archived"
+                    item["next_due_at"] = (today + timedelta(days=5)).isoformat()
+                else:
+                    item["status"] = "pass"
+
+        assert any(i["status"] == "archived" for i in queue), "nothing archived"
+        assert max(i["attempts"] for i in queue) >= 3

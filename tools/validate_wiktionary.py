@@ -30,6 +30,7 @@ from etimo.cache import default_path as default_cache_path  # noqa: E402
 from etimo.languages import impossible_order  # noqa: E402
 from etimo.models import Node, Relation, Terminal  # noqa: E402
 from etimo.walker import DEFAULT_MAX_DEPTH, Reconstructor, Result  # noqa: E402
+from etimo.wikitext import etymology_sections, language_section  # noqa: E402
 from etimo.wiktionary import (  # noqa: E402
     DictSource,
     SourceError,
@@ -373,7 +374,79 @@ def _invalidate_ledger(
     return count
 
 
-def _queue_sort_key(item: dict[str, Any]) -> tuple[int, int, str, str]:
+# Classes whose misreading invents an ancestor the source never claimed, as
+# against those whose misreading loses one it stated. Four rounds of this
+# project established that the first is the grave defect and the second the
+# venial one; the queue now says so too.
+SEVERE_LOAD = frozenset({"conditioning", "alternation", "synchrony"})
+
+# The same six classes the corpus builder searches for, applied here to the
+# Italian Etymology section alone. The builder's classification is an
+# over-estimate by construction — `insource:` matches anywhere on a page, and a
+# page holds every language spelling the word that way, so a French etymology
+# saying "possibly" marks the Italian lemma too. Auditing an entry means
+# fetching it, so the truth is free at that point and replaces the estimate.
+_LOAD_PATTERNS = {
+    "conditioning": re.compile(
+        r"\b(possibly|perhaps|probably|maybe|apparently|uncertain|unclear|"
+        r"disputed|alternatively|less\s+likely|more\s+likely|traditionally|"
+        r"said\s+to\s+be|thought\s+to\s+be|may\s+be|might\s+be)\b", re.I),
+    "alternation": re.compile(r"\}\}[^.]{0,80}\b(?:or|either)\b[^.]{0,80}\{\{", re.I),
+    "synchrony": re.compile(
+        r"\b(by\s+surface\s+analysis|surface\s+analysis|synchronically|"
+        r"analys?z?able\s+as|equivalent\s+to|morphologically)\b|\{\{\s*surf", re.I),
+    "non_ancestor": re.compile(
+        r"\b(compare|cognate|akin\s+to|related\s+to|whence|hence|displaced|"
+        r"superseded|influenced\s+by|by\s+analogy|modell?ed\s+(?:on|after)|"
+        r"not\s+related)\b|\bcf\.", re.I),
+    "mediation": re.compile(
+        r"\b(through|via|by\s+way\s+of|ultimately|itself\s+from|in\s+turn|"
+        r"going\s+back\s+to)\b", re.I),
+    "attribution": re.compile(
+        r"\b(suggests?|has\s+been\s+proposed|another\s+theory|argues?|"
+        r"some\s+scholars|posits?|speculates?)\b", re.I),
+}
+
+
+def _measure_load(raw_source: str | None, language: str) -> list[str] | None:
+    """The interpretive load of an entry, read from its own language section.
+
+    Returns None when the page could not be read at all, so that a network
+    failure is not mistaken for "this entry asks the parser nothing" — the
+    difference between an unknown and a zero, which is the distinction this
+    whole project turns on.
+    """
+    if not raw_source:
+        return None
+    section = language_section(raw_source, language)
+    if section is None:
+        return []
+    blocks = etymology_sections(section)
+    if not blocks:
+        return []
+    text = "\n".join(body for _, body in blocks)
+    return sorted(
+        name for name, pattern in _LOAD_PATTERNS.items() if pattern.search(text)
+    )
+
+
+def _load_rank(item: dict[str, Any]) -> int:
+    """Order within a pool: the entries a misreading can hurt most, first.
+
+    An entry carrying more than one class comes before one carrying a single
+    class of the same kind: the parser takes more than one decision there, so
+    a change in the text has more ways of mattering.
+    """
+    classes = set(item.get("load") or ())
+    if not classes:
+        return 3
+    severe = classes & SEVERE_LOAD
+    if severe:
+        return 0 if len(classes) > 1 else 1
+    return 2
+
+
+def _queue_sort_key(item: dict[str, Any]) -> tuple[int, int, int, str, str]:
     status_rank = {
         "priority": 0,
         "retry": 1,
@@ -387,6 +460,7 @@ def _queue_sort_key(item: dict[str, Any]) -> tuple[int, int, str, str]:
     last_validated = item.get("last_validated") or "1970-01-01T00:00:00+00:00"
     return (
         status_rank.get(item.get("status"), 99),
+        _load_rank(item),
         -int(item.get("priority", 0)),
         last_validated,
         item.get("word", ""),
@@ -453,7 +527,28 @@ def _diverse_pool_pick(pool: list[dict[str, Any]], limit: int) -> list[dict[str,
     return selected
 
 
-def _select_batch(queue: list[dict[str, Any]], batch_size: int) -> list[dict[str, Any]]:
+def _stale_since(item: dict[str, Any], revalidate_days: float) -> str:
+    """When this item became due for re-checking, as an ISO timestamp.
+
+    Returns a timestamp in the far future when the item has no validation date,
+    so that `<= now` is false and it is not selected: an item never audited
+    belongs to the `new` pool, not to this one.
+    """
+    last = item.get("last_validated")
+    if not last:
+        return "9999-12-31T00:00:00+00:00"
+    try:
+        when = datetime.fromisoformat(str(last).replace("Z", "+00:00"))
+    except ValueError:
+        return "9999-12-31T00:00:00+00:00"
+    return (when + timedelta(days=revalidate_days)).isoformat()
+
+
+def _select_batch(
+    queue: list[dict[str, Any]],
+    batch_size: int,
+    revalidate_days: float = DEFAULT_REVALIDATE_DAYS,
+) -> list[dict[str, Any]]:
     """Choose a deterministic daily batch, by quota over new/retry/review/recheck."""
     if batch_size <= 0 or not queue:
         return []
@@ -480,12 +575,27 @@ def _select_batch(queue: list[dict[str, Any]], batch_size: int) -> list[dict[str
         "manual_review": [
             item for item in queue if item.get("status") == "manual_review"
         ],
+        # A passed lemma is due again once it has gone stale. Without this the
+        # pool matched only `archived`, a status nothing could ever reach —
+        # three consecutive passes were required and a passed item was never
+        # re-selected, so the counter could not leave 1. The audit therefore
+        # had no way to notice that Wiktionary had changed under a lemma it had
+        # already seen, which is the one thing a *continuous* validation is for.
+        #
+        # `archived` is still honoured so that an explicitly archived item
+        # behaves as documented, but `pass` is what actually fills this pool.
         "recheck": [
             item
             for item in queue
-            if item.get("status") == "archived"
-            and item.get("next_due_at")
-            and item.get("next_due_at") <= now_iso
+            if (
+                item.get("status") == "archived"
+                and item.get("next_due_at")
+                and item.get("next_due_at") <= now_iso
+            )
+            or (
+                item.get("status") == "pass"
+                and _stale_since(item, revalidate_days) <= now_iso
+            )
         ],
     }
     for pool in groups.values():
@@ -816,6 +926,7 @@ def _run_single_case(
     except Exception:
         raw_source = None
     current_source_hash = _compute_source_hash(raw_source)
+    measured_load = _measure_load(raw_source, language)
 
     reconstructor = Reconstructor(source, max_depth=max_depth)
     error_obj: Exception | None = None
@@ -847,6 +958,7 @@ def _run_single_case(
             "expected": expected,
             "failure_class": fail_class,
             "source_hash": current_source_hash,
+            "measured_load": measured_load,
             "diagnostic_class": source_diagnostic,
             "reasons": [f"Execution failed: {error_msg}"],
             "error": error_msg,
@@ -895,6 +1007,7 @@ def _run_single_case(
         "expected": expected,
         "failure_class": fail_class if not is_ok else None,
         "source_hash": current_source_hash,
+        "measured_load": measured_load,
         "diagnostic_class": source_diagnostic,
         "reasons": all_failures,
         "fidelity_violations": fidelity_violations,
@@ -1040,6 +1153,15 @@ def _generate_markdown_summary(report: dict[str, Any]) -> str:
             f"| **Pass / Active** | `{statuses.get('pass', 0)}` "
             f"| **Archived (Stable)** | `{statuses.get('archived', 0)}` |"
         ),
+        # A zero a reader takes for a fact about the corpus — "no lemma is
+        # stable yet" — when it is a fact about the mechanism: a passed lemma
+        # is never re-selected, so the counter cannot move. Printing it
+        # unannotated is a limit of the tool wearing the clothes of a finding,
+        # which is the one thing this project exists not to do.
+        (
+            "| | | | _archiving is unreachable: a passed lemma is never "
+            "re-selected, so this counter cannot move_ |"
+        ),
         (
             f"| **Pending** | `{statuses.get('pending', 0)}` | "
             f"**Priority / Retry** | `{pr_count}` |"
@@ -1140,6 +1262,19 @@ def main() -> int:
         action="store_true",
         help="Force re-validation of all corpus lemmas in the ledger.",
     )
+    parser.add_argument(
+        "--revalidate-days",
+        type=float,
+        default=DEFAULT_REVALIDATE_DAYS,
+        help=(
+            "How many days a passed lemma stays fresh before it is due for "
+            "re-checking. The right value depends on how fast the source "
+            "actually changes and on how much of the corpus a day's batch can "
+            "reach: a period shorter than one full sweep spends the whole "
+            "batch on re-checks and never advances coverage "
+            f"(default: {DEFAULT_REVALIDATE_DAYS:g})."
+        ),
+    )
     args = parser.parse_args()
 
     ledger = _load_ledger(args.queue_file, args.seed_file)
@@ -1157,7 +1292,7 @@ def main() -> int:
 
     batch_id = f"audit-{_utc_now().strftime('%Y%m%d-%H%M%S')}"
     queue = ledger.get("items", [])
-    batch = _select_batch(queue, args.batch_size)
+    batch = _select_batch(queue, args.batch_size, args.revalidate_days)
 
     # Initialize source.
     #
@@ -1194,6 +1329,12 @@ def main() -> int:
         item["last_result"] = summary["status"]
         item["last_failure_class"] = summary.get("failure_class")
         item["source_hash"] = summary.get("source_hash")
+        # The estimate the corpus builder made from a whole-page search is
+        # replaced by what the Italian section actually says. None means the
+        # page could not be read, and must not overwrite a known value with
+        # silence.
+        if summary.get("measured_load") is not None:
+            item["load"] = summary["measured_load"]
         item["diagnostic_class"] = _classify_source_diagnostic(
             previous_hash,
             summary.get("source_hash"),
