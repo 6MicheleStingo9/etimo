@@ -80,7 +80,15 @@ INTERPRETIVE_CLASSES = {
     "conditioning": r"possibly|perhaps|probably|maybe|apparently|uncertain"
                     r"|unclear|disputed|alternatively|less likely|more likely"
                     r"|traditionally|said to be|thought to be|may be|might be",
-    "alternation": "\\}\\}[^.]*(or|either)[^.]*\\{\\{",
+    # `}}…or…{{` was too wide even within one Italian section: an «or» between
+    # two templates is an alternation of *claims* only when what follows is
+    # itself a relation. «compare {{cog|es|…}} or {{cog|pt|…}}» lists cognates,
+    # «{{lb|it|raro}} or {{lb|it|arcaico}}» qualifies, and neither claims an
+    # origin. Naming the relation templates cuts this from 9704 entries to
+    # 1175 — the class is the smallest of the six and the gravest, so it is
+    # narrowed rather than dropped.
+    "alternation": "(or|either) (from )?\\{\\{(der|inh|bor|uder|ubor|lbor|slbor"
+                   "|af|affix|suf|suffix|pre|prefix|com|compound|cal|calque)\\|",
     "synchrony": r"surface analysis|synchronically|analysable as|analyzable as"
                  r"|equivalent to|morphologically",
     # A missing link — the parser loses what the source stated.

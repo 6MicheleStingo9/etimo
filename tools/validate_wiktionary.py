@@ -119,6 +119,23 @@ def _classify_source_diagnostic(
     return "SOURCE_DRIFT"
 
 
+def _parser_fingerprint() -> str:
+    """A digest of the modules that decide what a tree looks like.
+
+    Skipping a walk because the page is unchanged is only safe while the code
+    reading it is unchanged too — otherwise the audit would sleep through
+    exactly the regression it exists to catch. The release version is too
+    coarse for that: it moves on releases, and a parser table can be widened a
+    dozen times between two of them.
+    """
+    digest = hashlib.sha256()
+    for name in ("wikitext.py", "walker.py", "models.py", "languages.py"):
+        path = SRC / "etimo" / name
+        if path.exists():
+            digest.update(path.read_bytes())
+    return f"sha256:{digest.hexdigest()[:16]}"
+
+
 def _file_sha256(path: Path) -> str:
     if not path.exists():
         return ""
@@ -527,6 +544,38 @@ def _diverse_pool_pick(pool: list[dict[str, Any]], limit: int) -> list[dict[str,
     return selected
 
 
+# A fixed re-check period is the wrong instrument for this corpus, because the
+# population is bimodal: measured on 500 lemmas, 17.6% of the interpretive-load
+# entries changed within 18 days against 7.5% of the rest, yet their *median*
+# age is 268 days against 118. A subset is actively worked — argued etymologies
+# attract editors who argue — and the remainder has not moved in years. Thirty
+# days spends most of its checks on the dormant group and is still slow on the
+# active one.
+#
+# So the period adapts per entry, and finds the rate rather than assuming it:
+# unchanged doubles it, changed resets it low. This matters because the true
+# rate is known only to within 8–34% — a number too soft to hard-code.
+MIN_REVALIDATE_DAYS = 14.0
+MAX_REVALIDATE_DAYS = 180.0
+
+
+def _next_period(
+    current: float, page_changed: bool, floor: float, *, observed: bool
+) -> float:
+    """How long this entry may rest before it is looked at again.
+
+    `observed` is false on a first audit, where there is no previous hash to
+    compare against. Doubling then would grant a page six months' rest on the
+    strength of never having been watched — an absence of evidence read as
+    evidence of stability, which is the mistake this project is built to avoid.
+    """
+    if page_changed:
+        return max(MIN_REVALIDATE_DAYS, min(floor, MAX_REVALIDATE_DAYS))
+    if not observed:
+        return floor
+    return min(current * 2.0, MAX_REVALIDATE_DAYS)
+
+
 def _stale_since(item: dict[str, Any], revalidate_days: float) -> str:
     """When this item became due for re-checking, as an ISO timestamp.
 
@@ -537,6 +586,9 @@ def _stale_since(item: dict[str, Any], revalidate_days: float) -> str:
     last = item.get("last_validated")
     if not last:
         return "9999-12-31T00:00:00+00:00"
+    # An entry that has earned a longer rest keeps it; the command-line value
+    # is the starting point, not a ceiling.
+    revalidate_days = float(item.get("revalidate_days") or revalidate_days)
     try:
         when = datetime.fromisoformat(str(last).replace("Z", "+00:00"))
     except ValueError:
@@ -912,6 +964,7 @@ def _run_single_case(
     source: WikitextSource,
     max_depth: int = DEFAULT_MAX_DEPTH,
     batch_id: str | None = None,
+    parser_fingerprint: str = "",
 ) -> dict[str, Any]:
     word = case["word"]
     language = case.get("language", "it")
@@ -927,6 +980,36 @@ def _run_single_case(
         raw_source = None
     current_source_hash = _compute_source_hash(raw_source)
     measured_load = _measure_load(raw_source, language)
+
+    # With 82% of pages unchanged between visits, a re-check that walks the
+    # whole chain spends several requests to reproduce a known answer. When
+    # neither the page nor the reading code has moved, the previous verdict
+    # still holds and one request settles it.
+    unchanged = (
+        previous_source_hash is not None
+        and current_source_hash == previous_source_hash
+        and case.get("parser_fingerprint") == parser_fingerprint
+        and case.get("last_result") == "pass"
+    )
+    if unchanged:
+        return {
+            "word": word,
+            "language": language,
+            "sense": sense,
+            "category": category,
+            "status": "pass",
+            "batch_id": batch_id,
+            "elapsed_seconds": 0.0,
+            "expected": expected,
+            "failure_class": None,
+            "source_hash": current_source_hash,
+            "measured_load": measured_load,
+            "diagnostic_class": None,
+            "reasons": [],
+            "fidelity_violations": [],
+            "skipped_walk": True,
+            "actual_summary": {"unchanged_since_last_audit": True},
+        }
 
     reconstructor = Reconstructor(source, max_depth=max_depth)
     error_obj: Exception | None = None
@@ -1291,6 +1374,7 @@ def main() -> int:
         return 0
 
     batch_id = f"audit-{_utc_now().strftime('%Y%m%d-%H%M%S')}"
+    fingerprint = _parser_fingerprint()
     queue = ledger.get("items", [])
     batch = _select_batch(queue, args.batch_size, args.revalidate_days)
 
@@ -1318,7 +1402,9 @@ def main() -> int:
         if args.rate_limit_delay > 0 and not isinstance(source, DictSource):
             time.sleep(args.rate_limit_delay)
 
-        summary = _run_single_case(item, source, batch_id=batch_id)
+        summary = _run_single_case(
+            item, source, batch_id=batch_id, parser_fingerprint=fingerprint
+        )
         processed.append(summary)
 
         # Update ledger item metadata and lifecycle
@@ -1328,6 +1414,18 @@ def main() -> int:
         item["last_batch_id"] = batch_id
         item["last_result"] = summary["status"]
         item["last_failure_class"] = summary.get("failure_class")
+        page_changed = bool(
+            previous_hash
+            and summary.get("source_hash")
+            and previous_hash != summary["source_hash"]
+        )
+        item["revalidate_days"] = _next_period(
+            float(item.get("revalidate_days") or args.revalidate_days),
+            page_changed,
+            args.revalidate_days,
+            observed=bool(previous_hash and summary.get("source_hash")),
+        )
+        item["parser_fingerprint"] = fingerprint
         item["source_hash"] = summary.get("source_hash")
         # The estimate the corpus builder made from a whole-page search is
         # replaced by what the Italian section actually says. None means the

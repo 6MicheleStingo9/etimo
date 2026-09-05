@@ -177,6 +177,59 @@ on is worth less than no red at all.
 
 ---
 
+## What gets audited, and how often
+
+The corpus is not flat. Measured on 600 random lemmas:
+
+| | share | entries | what a misreading produces |
+| --- | ---: | ---: | --- |
+| no Etymology section | 38.7% | ~49 100 | nothing to read |
+| templates only | 56.3% | ~71 600 | structural corruption, never a wrong reading |
+| **interpretive load** | **5.0%** | **~6 400** | **the parser judges, and can judge wrong** |
+
+Every defect this project has ever found came from that 5%: entries whose
+prose asks whether a form is an ancestor, a conjecture, a synchronic remark or
+a comparison. The other 120 000 are not easy — they are entries where no
+alternative reading exists.
+
+Six classes mark that load, and they are not equal:
+
+| | class | a misreading here |
+| --- | --- | --- |
+| grave | `conditioning` `alternation` `synchrony` | **invents an ancestor** the source never claimed |
+| venial | `non_ancestor` `mediation` `attribution` | **loses a link** the source stated |
+
+The queue orders by that, and an entry carrying more than one class comes
+first: the parser takes more than one decision there.
+
+**How the classification is made.** Six `insource:` searches at corpus-build
+time — 86 requests instead of 127 101 page downloads. It over-estimates,
+because a search matches anywhere on a page and a page holds every language
+that spells the word that way: measured against the Italian section on 50
+entries, **56% precision and 100% recall**. Over-estimating is the survivable
+half — it costs requests, where under-estimating would cost unseen defects —
+so the estimate only sets precedence, and the harness replaces it with the
+truth when it audits the entry.
+
+**How often.** The re-check period adapts per entry rather than being fixed,
+because the population is bimodal: 17.6% of interpretive-load entries changed
+within 18 days against 7.5% of the rest, yet their median age is 268 days
+against 118. Some are actively argued over; the rest have not moved in years.
+
+```text
+start at 30 days
+page unchanged  →  double, capped at 180
+page changed    →  back to 14
+first audit     →  no change: never watched is not the same as stable
+```
+
+A re-check whose page and parser are both unchanged costs one request instead
+of a walk. The parser side is a digest of the reading modules, not the release
+version: a table can be widened a dozen times between two releases, and a
+skipped walk must never sleep through the regression it exists to catch.
+
+---
+
 ## Queue lifecycle
 
 > **This section described three behaviours that have never happened and

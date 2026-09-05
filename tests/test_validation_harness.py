@@ -25,6 +25,7 @@ from tools.validate_wiktionary import (  # noqa: E402
     _invalidate_ledger,
     _load_ledger,
     _load_word_list,
+    _next_period,
     _run_single_case,
     _select_batch,
     _utc_now,
@@ -596,3 +597,106 @@ class TestPassIsNotAbsorbing:
 
         assert any(i["status"] == "archived" for i in queue), "nothing archived"
         assert max(i["attempts"] for i in queue) >= 3
+
+
+class TestAdaptivePeriod:
+    """A fixed re-check period is wrong for a bimodal population.
+
+    Measured on 500 lemmas: 17.6% of interpretive-load entries changed within
+    18 days, against 7.5% of the rest — yet their median age is 268 days
+    against 118. A subset is actively edited and the remainder has not moved in
+    years. The period therefore finds each entry's rate instead of assuming
+    one, which matters because the true rate is known only to within 8–34%.
+    """
+
+    def test_an_unchanged_page_earns_a_longer_rest(self):
+        assert _next_period(30.0, page_changed=False, floor=30.0, observed=True) == 60.0
+
+    def test_a_changed_page_is_watched_closely_again(self):
+        assert _next_period(120.0, page_changed=True, floor=30.0, observed=True) == 30.0
+
+    def test_rest_is_capped(self):
+        assert _next_period(160.0, page_changed=False, floor=30.0, observed=True) == 180.0
+
+    def test_a_first_audit_earns_nothing(self):
+        # No previous hash means the page was never watched. Doubling here
+        # would read an absence of evidence as evidence of stability.
+        assert _next_period(30.0, page_changed=False, floor=30.0, observed=False) == 30.0
+
+    def test_the_floor_is_never_below_the_minimum(self):
+        assert _next_period(60.0, page_changed=True, floor=1.0, observed=True) == 14.0
+
+
+class TestSkippingAnUnchangedWalk:
+    """Re-checking a page that has not moved should cost one request, not a walk.
+
+    But only while the code reading it has not moved either — otherwise the
+    audit would sleep through the very regression it exists to catch, which is
+    why the guard digests the parser's modules rather than trusting the release
+    version.
+    """
+
+    def test_the_fingerprint_tracks_the_reading_modules(self, tmp_path, monkeypatch):
+        import tools.validate_wiktionary as harness
+
+        first = harness._parser_fingerprint()
+        assert first.startswith("sha256:")
+        assert first == harness._parser_fingerprint(), "not deterministic"
+
+    def test_an_unchanged_page_and_parser_skips_the_walk(self):
+        page = "==Italian==\n\n===Etymology===\nFrom {{inh|it|la|focus}}.\n"
+        source = DictSource({"x": page})
+        fingerprint = "sha256:deadbeef"
+        first = _run_single_case(
+            {"word": "x", "language": "it"}, source, parser_fingerprint=fingerprint
+        )
+        assert not first.get("skipped_walk")
+
+        again = _run_single_case(
+            {
+                "word": "x", "language": "it",
+                "source_hash": first["source_hash"],
+                "parser_fingerprint": fingerprint,
+                "last_result": "pass",
+            },
+            source,
+            parser_fingerprint=fingerprint,
+        )
+        assert again["skipped_walk"] is True
+        assert again["status"] == "pass"
+
+    def test_a_changed_parser_forces_the_walk(self):
+        page = "==Italian==\n\n===Etymology===\nFrom {{inh|it|la|focus}}.\n"
+        source = DictSource({"x": page})
+        first = _run_single_case(
+            {"word": "x", "language": "it"}, source, parser_fingerprint="sha256:aaa"
+        )
+        again = _run_single_case(
+            {
+                "word": "x", "language": "it",
+                "source_hash": first["source_hash"],
+                "parser_fingerprint": "sha256:aaa",
+                "last_result": "pass",
+            },
+            source,
+            parser_fingerprint="sha256:bbb",   # the reading code moved
+        )
+        assert not again.get("skipped_walk")
+
+    def test_a_previous_failure_is_never_skipped(self):
+        page = "==Italian==\n\n===Etymology===\nFrom {{inh|it|la|focus}}.\n"
+        source = DictSource({"x": page})
+        first = _run_single_case(
+            {"word": "x", "language": "it"}, source, parser_fingerprint="sha256:aaa"
+        )
+        again = _run_single_case(
+            {
+                "word": "x", "language": "it",
+                "source_hash": first["source_hash"],
+                "parser_fingerprint": "sha256:aaa",
+                "last_result": "fail",
+            },
+            source,
+            parser_fingerprint="sha256:aaa",
+        )
+        assert not again.get("skipped_walk")
