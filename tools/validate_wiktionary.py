@@ -484,6 +484,36 @@ def _queue_sort_key(item: dict[str, Any]) -> tuple[int, int, int, str, str]:
     )
 
 
+# How a day's batch is divided between the three populations, measured rather
+# than assumed. Of 600 random lemmas: 38.7% carry no etymology, 56.3% state it
+# purely in templates, and 5% — about 6400 entries — ask the parser to judge.
+# Every defect this project ever found came from that 5%.
+#
+#   interpretive load   6400 ÷ 30 days = 215/day, so a full sweep takes a month
+#                       and the re-check period then sustains itself exactly
+#   templates only      30/day as a SENTINEL, not coverage: a structural
+#                       regression there is a property of the parser, not of
+#                       the entry, and any sample finds it. Covering all 71600
+#                       would buy with 71600 checks what 30 already establish
+#   no etymology        55/day, slow discovery. The event worth catching is the
+#                       source filling one in; that is per-entry and wants
+#                       coverage, but it guards nothing, it discovers
+CLASS_QUOTAS = {"load": 215, "templates": 30, "barren": 55}
+
+
+def _entry_population(item: dict[str, Any]) -> str:
+    """Which of the three populations an entry belongs to."""
+    if item.get("load"):
+        return "load"
+    if item.get("last_failure_class") == "SOURCE_LIMIT":
+        return "barren"
+    if item.get("last_result") is None:
+        # Never audited and not marked by the pre-filter: it could be either,
+        # and the audit itself is what tells them apart.
+        return "templates"
+    return "templates"
+
+
 def _allocate_batch_targets(batch_size: int) -> dict[str, int]:
     weights = {
         "new": 0.40,
@@ -506,42 +536,79 @@ def _allocate_batch_targets(batch_size: int) -> dict[str, int]:
 
 
 def _diverse_pool_pick(pool: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    """Take `limit` items from a pool, honouring the population quotas.
+
+    The grouping is by population and not by the entry's `category` field. The
+    two were fighting: this function re-sorted by severity, which undid the
+    proportions a caller had just arranged, and the batch came out 100%
+    interpretive load — correct by the sort key and wrong by design, since the
+    sentinel share of template-only entries would then never be reached. There
+    is one ordering here now, and severity decides *within* a population.
+    """
     if limit <= 0 or not pool:
         return []
 
     by_category: dict[str, list[dict[str, Any]]] = {}
     for item in pool:
-        category = item.get("category", "general")
-        by_category.setdefault(category, []).append(item)
+        by_category.setdefault(_entry_population(item), []).append(item)
 
     for cat_items in by_category.values():
         cat_items.sort(key=_queue_sort_key)
 
-    selected: list[dict[str, Any]] = []
-    selected_keys: set[tuple[str, str, Any]] = set()
+    return _take_by_quota(by_category, min(limit, len(pool)))
 
-    while len(selected) < min(limit, len(pool)):
-        picked_this_round = False
-        for cat_items in by_category.values():
-            if not cat_items:
-                continue
-            item = cat_items.pop(0)
-            key = (
-                item.get("word", ""),
-                item.get("language", "it"),
-                item.get("sense"),
-            )
-            if key in selected_keys:
-                continue
-            selected.append(item)
-            selected_keys.add(key)
-            picked_this_round = True
-            if len(selected) >= min(limit, len(pool)):
-                break
-        if not picked_this_round:
+
+def _pop_diverse(
+    bucket: list[dict[str, Any]], seen_categories: set[str]
+) -> dict[str, Any]:
+    """Take the best entry of a category not yet represented, else the best."""
+    for index, candidate in enumerate(bucket):
+        if candidate.get("category", "general") not in seen_categories:
+            seen_categories.add(candidate.get("category", "general"))
+            return bucket.pop(index)
+    # Every category is spoken for: start a fresh round, and register what this
+    # one takes. Clearing without registering meant the first pick of every
+    # round after the first came from whichever category sorted first, which
+    # is how a batch of 300 came out 233 `borrowed`.
+    seen_categories.clear()
+    item = bucket.pop(0)
+    seen_categories.add(item.get("category", "general"))
+    return item
+
+
+def _take_by_quota(
+    buckets: dict[str, list[dict[str, Any]]], limit: int
+) -> list[dict[str, Any]]:
+    """Serve whichever population is owed most, until `limit` is reached.
+
+    Proportional rather than round-robin: the three shares are 215, 30 and 55,
+    not one each. A population that runs dry yields its turns to the others,
+    so a batch is never short because one class was exhausted.
+    """
+    total = sum(CLASS_QUOTAS.values())
+    debt = dict.fromkeys(CLASS_QUOTAS, 0.0)
+    taken: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, Any]] = set()
+    # Within a population, spread across the entry categories rather than
+    # taking a run of the same kind. The population decides *how many*, the
+    # category decides *which* — two dimensions that a single round-robin
+    # cannot serve, and that were quietly fighting before.
+    seen_categories: set[str] = set()
+
+    while len(taken) < limit:
+        for name, quota in CLASS_QUOTAS.items():
+            debt[name] += quota / total
+        candidates = [n for n in CLASS_QUOTAS if buckets.get(n)]
+        if not candidates:
             break
-
-    return selected
+        name = max(candidates, key=lambda n: debt[n])
+        item = _pop_diverse(buckets[name], seen_categories)
+        debt[name] -= 1.0
+        key = (item.get("word", ""), item.get("language", "it"), item.get("sense"))
+        if key not in seen:
+            seen.add(key)
+            taken.append(item)
+    return taken
 
 
 # A fixed re-check period is the wrong instrument for this corpus, because the
@@ -550,11 +617,9 @@ def _diverse_pool_pick(pool: list[dict[str, Any]], limit: int) -> list[dict[str,
 # age is 268 days against 118. A subset is actively worked — argued etymologies
 # attract editors who argue — and the remainder has not moved in years. Thirty
 # days spends most of its checks on the dormant group and is still slow on the
-# active one.
-#
-# So the period adapts per entry, and finds the rate rather than assuming it:
-# unchanged doubles it, changed resets it low. This matters because the true
-# rate is known only to within 8–34% — a number too soft to hard-code.
+# active one, so the period adapts per entry and finds the rate rather than
+# assuming it. That matters because the true rate is known only to within
+# 8–34%, a number too soft to hard-code.
 MIN_REVALIDATE_DAYS = 14.0
 MAX_REVALIDATE_DAYS = 180.0
 
@@ -676,14 +741,16 @@ def _select_batch(
                 selected_keys.add(key)
 
     if len(selected) < batch_size:
-        fallback = sorted(
-            (
-                item
-                for item in queue
-                if item.get("status") not in {"blocked", "pass", "fail", "archived"}
-                and item.get("word")
-            ),
-            key=_queue_sort_key,
+        # The top-up honours the populations too, or the quotas just met would
+        # be undone by whatever sorts first.
+        remaining = [
+            item
+            for item in queue
+            if item.get("status") not in {"blocked", "pass", "fail", "archived"}
+            and item.get("word")
+        ]
+        fallback = _diverse_pool_pick(
+            sorted(remaining, key=_queue_sort_key), batch_size - len(selected)
         )
         for item in fallback:
             if len(selected) >= batch_size:

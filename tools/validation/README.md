@@ -211,6 +211,24 @@ half — it costs requests, where under-estimating would cost unseen defects —
 so the estimate only sets precedence, and the harness replaces it with the
 truth when it audits the entry.
 
+**How much per night.** 300 cases, divided by what a misreading could do:
+
+```text
+215/day   interpretive load   6400 ÷ 30 days — a full sweep in a month, after
+                              which the re-check period sustains itself exactly
+ 30/day   templates only      a SENTINEL, not coverage: a structural regression
+                              there is a property of the parser, not of the
+                              entry, so any sample finds it. Covering all 71600
+                              would buy with 71600 checks what 30 establish
+ 55/day   no etymology        slow discovery. The event worth catching is the
+                              source filling one in — per-entry, so it wants
+                              coverage, but it guards nothing
+```
+
+The shares hold at any batch size, and a population that runs dry yields its
+turns rather than shortening the batch. Within a population the entry
+categories are spread, so a night is not spent on one kind of word.
+
 **How often.** The re-check period adapts per entry rather than being fixed,
 because the population is bimodal: 17.6% of interpretive-load entries changed
 within 18 days against 7.5% of the rest, yet their median age is 268 days

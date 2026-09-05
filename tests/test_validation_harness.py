@@ -700,3 +700,62 @@ class TestSkippingAnUnchangedWalk:
             parser_fingerprint="sha256:aaa",
         )
         assert not again.get("skipped_walk")
+
+
+class TestPopulationQuotas:
+    """The batch is divided by what a misreading could do, not by what sorts first.
+
+    Measured on 600 random lemmas: 38.7% carry no etymology, 56.3% state it in
+    templates alone where the parser decides nothing, and 5% ask it to judge.
+    Every defect this project found came from that 5% — yet for nineteen nights
+    the batch was filled by sort order, so 95% of the audit went to entries
+    where nothing could go wrong.
+    """
+
+    @staticmethod
+    def _corpus(n=6000):
+        import hashlib
+        cats = ["borrowed", "compound", "uncertain-origin", "standard"]
+        queue = []
+        for i in range(n):
+            digest = int(hashlib.sha256(str(i).encode()).hexdigest()[:8], 16)
+            kind = "L" if i % 20 == 0 else ("B" if i % 20 < 9 else "T")
+            item = {
+                "word": f"{kind}{i}", "language": "it", "status": "pending",
+                "priority": 50, "category": cats[digest % 4], "attempts": 0,
+                "load": ["conditioning"] if kind == "L" else [],
+                "last_validated": None, "last_result": None,
+            }
+            if kind == "B":
+                item["last_failure_class"] = "SOURCE_LIMIT"
+            queue.append(item)
+        return queue
+
+    def test_the_measured_shares_are_honoured(self):
+        from collections import Counter
+        batch = _select_batch(self._corpus(), 300)
+        counts = Counter(item["word"][0] for item in batch)
+        assert counts["L"] == 215, "interpretive load must get its 215"
+        assert counts["T"] == 30, "template-only entries are a sentinel, not coverage"
+        assert counts["B"] == 55, "barren entries are discovery"
+
+    def test_the_shares_scale_to_any_batch_size(self):
+        from collections import Counter
+        for size in (20, 50, 100, 300):
+            counts = Counter(i["word"][0] for i in _select_batch(self._corpus(), size))
+            share = counts["L"] / max(1, sum(counts.values()))
+            assert 0.65 < share < 0.78, f"batch {size}: load share {share:.2f}"
+
+    def test_categories_stay_spread_within_a_population(self):
+        # Two dimensions, and they were fighting: the population decides how
+        # many, the category decides which. Sorting by one undid the other.
+        from collections import Counter
+        batch = _select_batch(self._corpus(), 300)
+        spread = Counter(item["category"] for item in batch)
+        assert len(spread) == 4
+        assert max(spread.values()) - min(spread.values()) <= 20
+
+    def test_an_empty_population_yields_its_share(self):
+        # No barren entries at all: the batch must still be full.
+        queue = [i for i in self._corpus() if i["word"][0] != "B"]
+        assert len(_select_batch(queue, 300)) == 300

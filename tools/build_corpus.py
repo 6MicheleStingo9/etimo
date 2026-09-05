@@ -80,15 +80,31 @@ INTERPRETIVE_CLASSES = {
     "conditioning": r"possibly|perhaps|probably|maybe|apparently|uncertain"
                     r"|unclear|disputed|alternatively|less likely|more likely"
                     r"|traditionally|said to be|thought to be|may be|might be",
-    # `}}…or…{{` was too wide even within one Italian section: an «or» between
-    # two templates is an alternation of *claims* only when what follows is
-    # itself a relation. «compare {{cog|es|…}} or {{cog|pt|…}}» lists cognates,
-    # «{{lb|it|raro}} or {{lb|it|arcaico}}» qualifies, and neither claims an
-    # origin. Naming the relation templates cuts this from 9704 entries to
-    # 1175 — the class is the smallest of the six and the gravest, so it is
-    # narrowed rather than dropped.
-    "alternation": "(or|either) (from )?\\{\\{(der|inh|bor|uder|ubor|lbor|slbor"
-                   "|af|affix|suf|suffix|pre|prefix|com|compound|cal|calque)\\|",
+    # What distinguishes an alternation of claims from a list of examples is
+    # **what opens the phrase**, not what follows the «or». A claim is declared
+    # once and the rest of the sentence inherits it:
+    #
+    #   {{bor|it|de|nichts}} or {{m|de|nix da}}   two claims, the second
+    #                                             inheriting the first
+    #   Compare {{cog|es|x}} or {{m|es|y}}        examples, no claim opened
+    #   also {{m|it|x}} or {{m|it|y}}             spelling variants
+    #
+    # The second term carries `{{m}}` for a technical reason and not a
+    # semantic one: `{{bor}}` categorises the entry and `{{m}}` does not, so
+    # repeating the relation would categorise it twice. House style therefore
+    # puts the categorising template first and mentions after.
+    #
+    # `\+?` matters more than it looks: `{{bor+}}`, `{{der+}}` and `{{inh+}}`
+    # are ordinary variants, and without it `cavolo` — «Possibly {{bor+|it|nap|
+    # cavolo}} or {{bor|it|scn|cavulu}}» — falls out of its own class.
+    #
+    # Measured: 3510 entries, 13% of them carrying a real alternation, and all
+    # four known cases caught. Precision is low and recall is what matters
+    # here: this is the class where a misreading invents an ancestor, and an
+    # over-marked entry costs an early audit while a missed one costs a defect.
+    "alternation": "\\{\\{(der|inh|bor|uder|ubor|lbor|af|suf|pre|com|cal)\\+?\\|"
+                   "[^}]*\\}\\}[^.]*(or|either)[^.]*"
+                   "\\{\\{(der|inh|bor|uder|ubor|lbor|af|suf|pre|com|cal|m|l)\\+?\\|",
     "synchrony": r"surface analysis|synchronically|analysable as|analyzable as"
                  r"|equivalent to|morphologically",
     # A missing link — the parser loses what the source stated.

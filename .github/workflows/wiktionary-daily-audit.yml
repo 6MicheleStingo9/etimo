@@ -14,9 +14,14 @@ on:
   workflow_dispatch:
     inputs:
       batch_size:
-        description: "Maximum number of validation cases to process"
+        description: >-
+          Cases per run. 300 covers the interpretive-load population in a month
+          (215/day), keeps 30 template-only entries as a sentinel and discovers
+          55 barren ones. 250 was suggested for the first month, to absorb the
+          pre-filter's over-estimate; it self-corrects as the ledger fills with
+          exact measurements.
         required: false
-        default: "100"
+        default: "300"
         type: string
       rebuild_corpus:
         description: >-
@@ -126,7 +131,7 @@ jobs:
           python tools/validate_wiktionary.py \
             --seed-file "$CORPUS_FILE" \
             --queue-file "$LEDGER_FILE" \
-            --batch-size "${{ inputs.batch_size || '100' }}" \
+            --batch-size "${{ inputs.batch_size || '300' }}" \
             --output-dir artifacts/wiktionary-validation \
             --rate-limit-delay 0.5 \
             --summary-md "$GITHUB_STEP_SUMMARY"
