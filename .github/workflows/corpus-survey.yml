@@ -1,0 +1,97 @@
+# One pass over every Italian lemma, to establish how far etimo reaches.
+#
+# Separate from the nightly audit on purpose. The audit asks whether the parser
+# has broken and never ends, because the source never stops moving; a sample
+# answers it. This asks how much of the language the tool can read at all —
+# a property of the distribution, which has to be counted rather than sampled,
+# and which finishes.
+#
+# Sharing one job would have starved this one: work with an end always loses to
+# work without one when they compete for the same quota.
+name: Corpus survey
+
+on:
+  schedule:
+    # Two hours after the audit, so the two never contend for the same cache
+    # entry or the same courtesy budget at Wikimedia.
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: >-
+          How long this slice may run. The whole corpus takes weeks; each run
+          takes a slice and hands over, resuming from the append-only log.
+        required: false
+        default: "120"
+        type: string
+
+concurrency:
+  group: "corpus-survey"
+  cancel-in-progress: false
+
+env:
+  VALIDATION_BRANCH: prog_validation/wikitionary-daily-audit
+  CORPUS_FILE: tools/validation/corpus_catalog.json
+  SURVEY_FILE: tools/validation/corpus-survey.jsonl
+
+jobs:
+  survey:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the validation branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.VALIDATION_BRANCH }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # The survey benefits from the cache more than the audit does:
+      # etymological chains converge, so the upper entries are already on disk
+      # by the time the corpus is a few thousand words in.
+      - name: Restore etimo cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/etimo
+          key: etimo-survey-cache-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            etimo-survey-cache-${{ runner.os }}-
+            etimo-wiktionary-cache-${{ runner.os }}-
+
+      - name: Install project
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Require a corpus snapshot
+        run: |
+          if [ ! -f "$CORPUS_FILE" ]; then
+            echo "::error::No corpus snapshot at $CORPUS_FILE. Run the audit" \
+                 "workflow once with rebuild_corpus enabled."
+            exit 1
+          fi
+
+      - name: Survey a slice of the corpus
+        run: |
+          python tools/survey_corpus.py \
+            --corpus "$CORPUS_FILE" \
+            --output "$SURVEY_FILE" \
+            --minutes "${{ inputs.minutes || '120' }}" \
+            --delay 0.5 \
+            --summary-md "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit the survey log
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          [ -f "$SURVEY_FILE" ] && git add "$SURVEY_FILE"
+          if git diff --cached --quiet; then
+            echo "Nothing new surveyed."
+            exit 0
+          fi
+          git commit -m "chore(survey): extend the corpus survey [skip ci]"
+          git push origin "HEAD:$VALIDATION_BRANCH"

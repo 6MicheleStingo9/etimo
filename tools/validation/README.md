@@ -70,6 +70,52 @@ changed one says so.
 
 ---
 
+## The survey: a different question, deliberately apart
+
+`tools/survey_corpus.py` walks **every** Italian lemma once and records where
+the tool gets to. It is not part of the nightly audit, and the separation is
+the point.
+
+| | the audit | the survey |
+| --- | --- | --- |
+| asks | has the parser broken? | how much of the language can it read? |
+| answered by | a sample — a regression is a property of the code | a count — reach is a property of the distribution |
+| ends | never, the source keeps moving | yes, in weeks |
+
+Sharing one job would have starved the survey: work with an end always loses
+to work without one when the two compete for a quota.
+
+Each entry is recorded as one of four outcomes:
+
+| | |
+| --- | --- |
+| `complete` | every branch ended on a fact about the language |
+| `partial` | some branches on a fact, others on a limit |
+| `limited` | every branch stopped at a limit of the source or the program |
+| `no chain` | no ancestor could be read at all |
+
+`partial` is not a rounding of the other two. A compound whose halves fare
+differently is the ordinary case, and collapsing it would hide exactly the
+distinction this project exists to keep.
+
+**What a survey cannot say.** A recorded chain is not a correct chain.
+`Trebisacce` once descended from «tre bisacce» while its own entry called the
+name a corruption of τραπεζὰκιον, and every structural check passed. The survey
+maps where the tool arrives; whether what it says there is true is a question
+for the hand-written expectations and for a reader.
+
+Results are appended as JSON Lines. A run of 127101 entries takes weeks and
+will be interrupted, so each row is written and flushed as it is produced: an
+interruption costs the entry in flight and nothing else, and a half-written
+final line is skipped on resumption rather than being fatal.
+
+```bash
+python tools/survey_corpus.py --minutes 120     # take a slice
+python tools/survey_corpus.py --summary         # totals so far
+```
+
+---
+
 ## Measuring this system
 
 Most of what went wrong here went wrong in the *measurement*, not in the code,
