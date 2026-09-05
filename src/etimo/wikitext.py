@@ -793,7 +793,24 @@ def _split_body_and_discussion(text: str) -> tuple[str, list[str]]:
 
 
 def _normalize_name(name) -> str:
-    """Comparable template name: lowercase, without the "+" variant."""
+    """Comparable template name: lowercase, without the "+" variant.
+
+    The `+` is not a suffix on a name, it is an argument hidden in one: it asks
+    the module to render the introductory wording as well. No template anywhere
+    uses a trailing `+` to mean a different relation, so stripping it never
+    collapses two claims into one — only two typographies of the same claim.
+
+    It does move text, though, and that is worth knowing before writing
+    anything that reads the raw page. On an entry using `{{bor+}}` the words
+    "Borrowed from" exist only in the rendering; on one using `{{bor}}` they
+    are typed by hand and are therefore text. A check that looks in the
+    wikitext for the word naming a relation will find less of it on `+` pages
+    and conclude they claim less. **The `+` does not change the relation, it
+    changes where the relation is written.**
+
+    Qualifiers are unaffected — `possibly`, `perhaps`, `or` are prose either
+    way — which is why `cavolo` reads correctly as «Possibly {{bor+|…}}».
+    """
     return str(name).strip().lower().rstrip("+")
 
 

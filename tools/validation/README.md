@@ -93,9 +93,17 @@ an apparent structure in the result** — and a modulus is worse than a ranking,
 because a ranking is visibly an order while a modulus looks like chance.
 
 The practical rule: when a measurement says the code is wrong, check the
-measurement first. Across this project that instinct was right far more often
-than not — seventeen corrections to the measuring instruments against five to
-the program, and none of the seventeen ever understated a defect.
+measurement first. The count across this project is **eighteen corrections to
+the measuring instruments, of which eight accused working code, and not one
+ever excused a defect.**
+
+Eight out of eighteen is not "now and then" — it is nearly one time in two.
+And the second half is what carries the weight: the asymmetry is not luck, it
+is a property of the kind of check. Anything that verifies an **absence** —
+"this ought to be here and is not" — can only fail in one direction, because
+every gap in the instrument becomes an accusation and no gap becomes an
+acquittal. Whoever writes the next such check should expect its errors to land
+on the code, and weigh them accordingly.
 
 ---
 
