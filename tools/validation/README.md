@@ -70,6 +70,35 @@ changed one says so.
 
 ---
 
+## Measuring this system
+
+Most of what went wrong here went wrong in the *measurement*, not in the code,
+and twice the same way. Both are worth knowing before writing another one.
+
+**A sample can be too small to say anything.** The `alternation` class is 0.3%
+of the corpus: sixty random entries contained exactly one, and six thousand
+would be needed for twenty. Where a class is that rare, a random sample cannot
+estimate it and the cases have to be chased by name — which is the opposite of
+how everything else here was measured, and the right way round for this.
+
+**A sample can also be built wrong, and that is worse.** Testing the batch
+quotas, the synthetic corpus assigned categories with `(i * 7 + 3) % 4` and
+populations with `i % 20`. The two share a factor, so every interpretive-load
+entry landed in the same category and the result looked lopsided while the code
+was correct. Two rounds went to fixing a defect that was not there.
+
+The peer lost eight measurements to the same shape, sampling from the head of a
+relevance ranking. **An unintended structure in how a sample is built becomes
+an apparent structure in the result** — and a modulus is worse than a ranking,
+because a ranking is visibly an order while a modulus looks like chance.
+
+The practical rule: when a measurement says the code is wrong, check the
+measurement first. Across this project that instinct was right far more often
+than not — seventeen corrections to the measuring instruments against five to
+the program, and none of the seventeen ever understated a defect.
+
+---
+
 ## Structural invariants
 
 Run on every lemma, with nothing written by hand:
