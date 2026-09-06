@@ -62,6 +62,17 @@ will not survive the week.
 | `main` | the released tool. No direct commits, no automation. |
 | `prog_validation/…` | development. Human and agent changes arrive by pull request. |
 
+**How an issue gets executed, from September 2026.** Read the repository
+first — the open issues and their comments say what is live and what class it
+is. Then hand one issue to a subagent with the `Agent` tool, **one issue at a
+time**, and let it work; a subagent may comment on the issue it was given when
+it needs to. It reports back and the pull request is opened from here.
+
+The constraint that makes «one at a time» the rule rather than a preference:
+subagents live inside this session, spend its quota, and die with it. They are
+not peers. Nothing they hold survives, so anything they establish has to be in
+the issue, the branch or the pull request before the session ends.
+
 **Michele merges.** The two of us open issues, write pull requests and review
 them; the merge button is his, on every pull request, without exception —
 stated 6 September, after a session tried to merge its own. A pull request is a
