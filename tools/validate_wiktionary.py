@@ -323,7 +323,33 @@ def _load_ledger(queue_file: Path, seed_file: Path) -> dict[str, Any]:
     existing_keys = {
         (it.get("word"), it.get("language", "it"), it.get("sense")) for it in items
     }
-    added = False
+
+    # Carry the corpus's interpretive-load estimate onto entries the ledger
+    # already holds. Without this a rebuilt snapshot classifies nothing that
+    # matters: the ledger was seeded before classification existed, so 127095
+    # of 127101 entries had no class and every quota resolved to the same pool.
+    #
+    # A measurement never yields to an estimate. `load_measured` marks the
+    # entries the harness has read for itself, from the Italian section alone,
+    # and those are the truth the estimate was standing in for.
+    estimates = {
+        (case.get("word"), case.get("language", "it")): case.get("load")
+        for case in seed_cases
+        if case.get("load")
+    }
+    refreshed = 0
+    for item in items:
+        if item.get("load_measured"):
+            continue
+        estimate = estimates.get((item.get("word"), item.get("language", "it")))
+        if estimate and item.get("load") != estimate:
+            item["load"] = estimate
+            refreshed += 1
+    if refreshed:
+        print(f"carried {refreshed} load estimates onto existing entries",
+              file=sys.stderr)
+
+    added = bool(refreshed)
     for case in seed_cases:
         key = (case.get("word"), case.get("language", "it"), case.get("sense"))
         if key not in existing_keys and case.get("word"):
@@ -1500,6 +1526,9 @@ def main() -> int:
         # silence.
         if summary.get("measured_load") is not None:
             item["load"] = summary["measured_load"]
+            # Read from the Italian section itself: this outranks whatever the
+            # corpus-wide search estimated, and must not be overwritten by it.
+            item["load_measured"] = True
         item["diagnostic_class"] = _classify_source_diagnostic(
             previous_hash,
             summary.get("source_hash"),
