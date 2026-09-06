@@ -62,6 +62,11 @@ will not survive the week.
 | `main` | the released tool. No direct commits, no automation. |
 | `prog_validation/…` | development. Human and agent changes arrive by pull request. |
 
+**Michele merges.** The two of us open issues, write pull requests and review
+them; the merge button is his, on every pull request, without exception —
+stated 6 September, after a session tried to merge its own. A pull request is a
+proposal, and it stays open until he takes it.
+
 **One exception, and it is not negotiable:** the two workflows commit the ledger
 and the survey log to this branch every night, directly. That is why branch
 protection forbids force-pushes and deletion but does not require review — a
@@ -69,8 +74,11 @@ mandatory-review rule would stop the audit dead. The bot's commits are data,
 not development; they are `[skip ci]` and touch only
 `tools/validation/*.json` and `corpus-survey.jsonl`.
 
-**Labels carry the perimeter.** `area: code` is the developer session's to
-decide, `area: language` the linguist's. `needs measurement` means exactly
+**Labels carry the perimeter.** `code` is the developer session's to decide,
+`language` the linguist's — bare, with no prefix: an `area:` prefix was tried on
+6 September and removed the same day, because `area` is the name of an unrelated
+project of Michele's and the collision is exactly the kind of ambiguity a label
+exists to prevent. `needs measurement` means exactly
 that: this project has been wrong often enough by estimating that an unmeasured
 change is not accepted, however obvious it looks.
 
