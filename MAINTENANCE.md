@@ -75,6 +75,22 @@ thing he delegated.
 `tools/check_readme_examples.py` tests it — it changes with the code and goes
 through a pull request with it.
 
+**«Commit it directly» is addressed to the developer session only.** The
+linguist session works under a standing constraint on all of Michele's
+repositories — it prepares files and stops; the git operations are not its to
+perform. Michele authorised it to *comment* on the repository, in those words,
+which cut a slit in that constraint rather than removing it. Whether
+«modify the `.md` files directly» reaches as far as commit and push is his to
+say, and only his.
+
+**Until he says otherwise: the linguist writes the file and names it; the
+developer session commits it.** That is one extra line in a message and no
+risk, and it is the correct outcome even if the wider reading turns out to be
+right — a peer cannot widen a permission the user granted in a precise form.
+Had this session simply asserted the wider reading, it would have moved
+Michele's boundary on his behalf, which is a worse failure than a redundant
+round trip.
+
 **How an issue gets executed, from September 2026.** Read the repository
 first — the open issues and their comments say what is live and what class it
 is. Then hand one issue to a subagent with the `Agent` tool, **one issue at a
