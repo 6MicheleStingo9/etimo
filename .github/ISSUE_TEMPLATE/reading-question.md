@@ -1,7 +1,7 @@
 ---
 name: Reading question
 about: What does this phrasing claim, and what may the tree do with it?
-labels: "area: language"
+labels: "language"
 ---
 
 ## The phrasing

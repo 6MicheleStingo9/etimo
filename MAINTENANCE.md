@@ -69,8 +69,11 @@ mandatory-review rule would stop the audit dead. The bot's commits are data,
 not development; they are `[skip ci]` and touch only
 `tools/validation/*.json` and `corpus-survey.jsonl`.
 
-**Labels carry the perimeter.** `area: code` is the developer session's to
-decide, `area: language` the linguist's. `needs measurement` means exactly
+**Labels carry the perimeter.** `code` is the developer session's to decide,
+`language` the linguist's — bare, with no prefix: an `area:` prefix was tried on
+6 September and removed the same day, because `area` is the name of an unrelated
+project of Michele's and the collision is exactly the kind of ambiguity a label
+exists to prevent. `needs measurement` means exactly
 that: this project has been wrong often enough by estimating that an unmeasured
 change is not accepted, however obvious it looks.
 
