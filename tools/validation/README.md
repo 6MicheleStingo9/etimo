@@ -98,6 +98,34 @@ Each entry is recorded as one of four outcomes:
 differently is the ordinary case, and collapsing it would hide exactly the
 distinction this project exists to keep.
 
+### Anchoring: the one check that does not use the parser's tables
+
+Alongside where the walk reached, the survey records whether **every form it
+drew appears in the pages it read**. A flat textual question, asked of the raw
+wikitext, so a form the tool manufactured has nowhere to hide — not even when
+the manufacture came out of a table that the parser and any table-driven check
+would agree about.
+
+`etimo` does not judge Wiktionary. If an entry is wrong, `etimo` reports it
+wrong and has done its job. So "correct" here has one meaning, and it is
+verifiable: **the tree says what the entry says, in the way the entry says it**
+— a conjecture stays a conjecture, a synchronic remark does not become a
+descent, a comparison does not become an ancestor, and nothing named is lost.
+
+Anchoring is the floor of that: not "this ancestor is real" but "this ancestor
+was written down by the source". It is the only correctness this tool can be
+held to, and the one it can be held to absolutely.
+
+Two details, each of which first showed up as the check accusing working code:
+
+- **Page titles count as text.** An entry rarely repeats its own name in its
+  etymology — `dipelare` says «From {{af|it|di-|pelo|-are}}» and never writes
+  "dipelare". Comparing against the body alone reported the starting word as
+  invented on every entry of that shape.
+- **Editorial marks are normalised**, as the walker already normalises them:
+  an entry writes `πλατεῖα` where the page is titled `πλᾰτεῖᾰ`, and a
+  difference of diacritics is a spelling, not a fabrication.
+
 **What a survey cannot say.** A recorded chain is not a correct chain.
 `Trebisacce` once descended from «tre bisacce» while its own entry called the
 name a corruption of τραπεζὰκιον, and every structural check passed. The survey

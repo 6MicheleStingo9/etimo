@@ -35,6 +35,7 @@ import argparse
 import json
 import sys
 import time
+import unicodedata
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -91,6 +92,89 @@ def _already_done(path: Path) -> set[str]:
     return done
 
 
+class _Recording:
+    """A source that keeps every page it hands over.
+
+    The anchoring check needs the raw wikitext of every page the walk read, and
+    the walk does not report which pages those were. Wrapping the source is the
+    cheapest way to find out: no extra request, and the pages are already in
+    memory by the time the tree exists.
+    """
+
+    def __init__(self, source: WikitextSource) -> None:
+        self.source = source
+        self.pages: dict[str, str] = {}
+
+    def wikitext(self, title: str) -> str | None:
+        text = self.source.wikitext(title)
+        if text:
+            self.pages[title] = text
+        return text
+
+    def seen(self) -> str:
+        """Everything read, titles included.
+
+        The titles matter: the word being looked up is the root of its own
+        tree, and an entry does not generally repeat its own name in its
+        etymology — `dipelare` says «From {{af|it|di-|pelo|-are}}» and never
+        writes "dipelare" anywhere. Comparing against the body alone reported
+        the starting word as unanchored on every entry of that shape, which is
+        the check accusing the tool of inventing the question it was asked.
+        """
+        return "\n".join([*self.pages, *self.pages.values()])
+
+
+def _bare(text: str) -> str:
+    """A form stripped of the marks that differ between citations.
+
+    An entry writes `πλατεῖα` where the page is titled `πλᾰτεῖᾰ`, and
+    `*ḱḗr ~ *ḱr̥d-` where another writes `*ḱḗr`. Comparing those as strings
+    reports a fabrication that did not happen — the same normalisation the
+    walker uses when it reconciles two entries, for the same reason.
+    """
+    decomposed = unicodedata.normalize("NFD", text.lstrip("*").casefold())
+    return "".join(c for c in decomposed if not unicodedata.combining(c))
+
+
+def _anchoring(root: Node, seen_text: str) -> dict[str, Any]:
+    """Whether every form drawn is one the source actually wrote.
+
+    This is the check that matters most and the only one here that does **not**
+    go through the parser's tables. It asks a flat textual question — does this
+    lemma appear anywhere in the pages the walk read? — so a form the tool
+    invented has nowhere to hide, even if the invention came from a table the
+    parser and any table-driven check would agree about.
+
+    It cannot say an etymology is *true*: that is Wiktionary's business and not
+    ours. It says the tree is **anchored** — that everything in it was taken
+    from the source rather than manufactured — which is the only correctness
+    this tool can be held to, and the one it can be held to absolutely.
+
+    A form is looked for in the whole of what was read, not in the entry that
+    hosts it: the reserve deliberately carries forms from one entry into
+    another, so requiring each node to appear in its own parent's page would
+    report that design as a defect.
+    """
+    haystack = _bare(seen_text)
+    drawn = [node.form for node in _every_node(root) if node.form.lemma]
+    unanchored = [
+        f"{form.lemma}::{form.language}"
+        for form in drawn
+        if _bare(form.lemma) and _bare(form.lemma) not in haystack
+    ]
+    return {
+        "forms_drawn": len(drawn),
+        "forms_unanchored": len(unanchored),
+        "unanchored": unanchored[:8],
+    }
+
+
+def _every_node(node: Node):
+    yield node
+    for child in node.children:
+        yield from _every_node(child)
+
+
 def _terminals(node: Node) -> list[Node]:
     if not node.children:
         return [node]
@@ -103,8 +187,9 @@ def _terminals(node: Node) -> list[Node]:
 def _survey_one(word: str, source: WikitextSource) -> dict[str, Any]:
     """Where the walk got to for one lemma, and at whose limit it stopped."""
     started = time.perf_counter()
+    recorder = _Recording(source)
     try:
-        result = Reconstructor(source).reconstruct(word, "it")
+        result = Reconstructor(recorder).reconstruct(word, "it")
     except SourceError as error:
         return {"word": word, "outcome": "unreachable", "error": str(error)[:120]}
     except Exception as error:  # a survey must not stop on one entry
@@ -132,11 +217,15 @@ def _survey_one(word: str, source: WikitextSource) -> dict[str, Any]:
     else:
         outcome = "limited"
 
+    anchoring = _anchoring(result.start, recorder.seen())
+
     return {
         "word": word,
         "outcome": outcome,
+        "anchored": anchoring["forms_unanchored"] == 0,
         "steps": result.steps,
         "terminals": sorted({t.name.lower() for t in terminals}),
+        **anchoring,
         "linguistic_terminals": len(linguistic),
         "total_terminals": len(terminals),
         "resolved_to": result.start.form.lemma if result.resolved else None,
@@ -151,6 +240,9 @@ def _summarise(path: Path) -> dict[str, Any]:
     terminals: Counter[str] = Counter()
     steps_total = 0
     counted = 0
+    anchored = 0
+    with_forms = 0
+    unanchored_examples: list[str] = []
     with path.open(encoding="utf-8") as handle:
         for line in handle:
             try:
@@ -162,11 +254,27 @@ def _summarise(path: Path) -> dict[str, Any]:
             steps_total += int(row.get("steps") or 0)
             for name in row.get("terminals", []):
                 terminals[name] += 1
+            if row.get("forms_drawn"):
+                with_forms += 1
+                if row.get("anchored"):
+                    anchored += 1
+                elif len(unanchored_examples) < 20:
+                    unanchored_examples.append(
+                        f"{row['word']}: {', '.join(row.get('unanchored', []))}"
+                    )
     return {
         "surveyed": counted,
         "outcomes": dict(outcomes.most_common()),
         "terminals": dict(terminals.most_common()),
         "mean_steps": round(steps_total / counted, 2) if counted else 0.0,
+        # Of the entries that drew anything at all, how many drew only forms
+        # the source had actually written. This is the reliability figure: not
+        # whether the etymologies are right — Wiktionary's business — but
+        # whether the tool reported what the source says.
+        "anchored": anchored,
+        "with_forms": with_forms,
+        "anchored_percent": round(100 * anchored / with_forms, 2) if with_forms else 0.0,
+        "unanchored_examples": unanchored_examples,
     }
 
 
@@ -259,6 +367,12 @@ def main() -> int:
             f"({100 * summary['surveyed'] / max(1, total):.1f}%), "
             f"{processed} this run.",
             "",
+            f"**Anchored: {summary['anchored']} of {summary['with_forms']}** "
+            f"({summary['anchored_percent']}%) — every form drawn was one the "
+            "source had written. This is not a claim that the etymologies are "
+            "right, which is Wiktionary's business; it is the claim that the "
+            "tool reported what the source says.",
+            "",
             "| outcome | count | meaning |",
             "|---|---:|---|",
         ]
@@ -272,6 +386,16 @@ def main() -> int:
         }
         for name, count in summary["outcomes"].items():
             lines.append(f"| `{name}` | {count} | {meaning.get(name, '')} |")
+        if summary["unanchored_examples"]:
+            lines += [
+                "",
+                "### Forms drawn that the source did not write",
+                "",
+                "Each of these is a defect: the tool put something in a tree "
+                "that is not in the pages it read.",
+                "",
+                *(f"- `{example}`" for example in summary["unanchored_examples"]),
+            ]
         args.summary_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     return 0

@@ -124,3 +124,65 @@ class TestSummary:
         assert summary["outcomes"]["complete"] == 2
         assert summary["terminals"]["uncertain_origin"] == 2
         assert summary["mean_steps"] == 2.0
+
+
+class TestAnchoring:
+    """Every form drawn must be one the source actually wrote.
+
+    This is the only check in the project that does not go through the
+    parser's tables: it asks a flat textual question — does this lemma appear
+    anywhere in the pages the walk read? — so a form the tool manufactured has
+    nowhere to hide, even when the manufacture came from a table that a
+    table-driven check would agree with.
+
+    It says nothing about whether an etymology is true. That is Wiktionary's
+    business. It says the tree is *anchored*: everything in it was taken from
+    the source rather than invented — the only correctness this tool can be
+    held to, and one it can be held to absolutely.
+    """
+
+    def test_a_tree_taken_from_the_source_is_anchored(self):
+        source = DictSource({
+            "x": entry("Italian", "From {{inh|it|la|focus}}."),
+            "focus": entry("Latin", "Of uncertain origin."),
+        })
+        row = _survey_one("x", source)
+        assert row["anchored"] is True
+        assert row["forms_unanchored"] == 0
+
+    def test_a_manufactured_form_is_caught(self):
+        # The check must be able to fail, or it is decoration. A walker that
+        # invents `phantasma` out of a table nobody checked would pass every
+        # structural invariant; it does not pass this.
+        from etimo.models import Form, Node
+        from tools.survey_corpus import _anchoring
+
+        root = Node(form=Form(lemma="x", language="it"))
+        root.children.append(Node(form=Form(lemma="phantasma", language="la")))
+        # `seen()` prepends the page titles; here the haystack is written out,
+        # so "x" stands for the title the walk started from.
+        result = _anchoring(root, "x\n==Italian==\nFrom {{inh|it|la|focus}}.")
+
+        assert result["forms_unanchored"] == 1
+        assert result["unanchored"] == ["phantasma::la"]
+
+    def test_the_word_looked_up_is_not_called_invented(self):
+        # An entry rarely repeats its own name in its etymology: `dipelare`
+        # says «From {{af|it|di-|pelo|-are}}» and never writes "dipelare".
+        # Comparing against the body alone reported the starting word as
+        # unanchored on every entry of that shape — the check accusing the tool
+        # of inventing the question it had been asked.
+        source = DictSource({"dipelare": entry("Italian", "From {{af|it|di-|pelo}}.")})
+        assert _survey_one("dipelare", source)["anchored"] is True
+
+    def test_editorial_marks_do_not_count_as_invention(self):
+        # An entry writes `πλατεῖα` where the page is titled `πλᾰτεῖᾰ`. The
+        # same normalisation the walker uses to reconcile two entries applies
+        # here, for the same reason: a difference of diacritics is a spelling,
+        # not a fabrication.
+        from etimo.models import Form, Node
+        from tools.survey_corpus import _anchoring
+
+        root = Node(form=Form(lemma="πλᾰτεῖᾰ", language="grc"))
+        haystack = "πλᾰτεῖᾰ\nfrom {{der|it|grc|πλατεῖα}}"
+        assert _anchoring(root, haystack)["forms_unanchored"] == 0
