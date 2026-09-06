@@ -186,3 +186,63 @@ class TestAnchoring:
         root = Node(form=Form(lemma="πλᾰτεῖᾰ", language="grc"))
         haystack = "πλᾰτεῖᾰ\nfrom {{der|it|grc|πλατεῖα}}"
         assert _anchoring(root, haystack)["forms_unanchored"] == 0
+
+
+class TestReadingOrder:
+    """The survey walks a corpus of 127101 over weeks, so every figure it
+    reports before finishing is a figure about its prefix.
+
+    In alphabetical order that prefix is not a sample of anything. Italian puts
+    its adverbial locutions under «a» — `a caldo`, `alla moda` — because they
+    are governed by a preposition, and its toponyms under `Acqua-`, `Alb-`.
+    The first 6805 entries were 6295 «a» words, and reported 45.7% of the
+    corpus as unreadable where the figure for lemmas is 31.2%.
+
+    Nobody built that bias: alphabetical order came for free and had a
+    structure inside it.
+    """
+
+    def test_the_order_is_not_alphabetical(self):
+        from tools.survey_corpus import _survey_order
+
+        words = ["abaco", "abate", "abside", "zuppa", "zebra"]
+        walked = sorted(words, key=_survey_order)
+        assert walked != sorted(words), "still walking the alphabet"
+
+    def test_the_order_is_stable_across_runs(self):
+        # A survey resumes from an append-only log; an order that changed
+        # between runs would revisit some entries and never reach others.
+        from tools.survey_corpus import _survey_order
+
+        words = ["abaco", "zuppa", "mela", "-mente", "Roma"]
+        assert sorted(words, key=_survey_order) == sorted(words, key=_survey_order)
+
+    def test_shapes_are_told_apart(self):
+        from tools.survey_corpus import _shape
+
+        assert _shape("a caldo") == "multiword"
+        assert _shape("alla luce del sole") == "multiword"
+        assert _shape("Acquappesa") == "proper"
+        assert _shape("-mente") == "affix"
+        assert _shape("pre-") == "affix"
+        assert _shape("cavolo") == "lemma"
+
+    def test_the_summary_states_what_it_looked_at(self, tmp_path):
+        # A figure without its denominator is a statement about a slice
+        # dressed as a statement about the corpus.
+        log = tmp_path / "survey.jsonl"
+        log.write_text(
+            "\n".join(
+                json.dumps(row)
+                for row in (
+                    {"word": "cavolo", "outcome": "complete", "steps": 2},
+                    {"word": "a caldo", "outcome": "no chain", "steps": 0},
+                    {"word": "Roma", "outcome": "no chain", "steps": 0},
+                )
+            ) + "\n",
+            encoding="utf-8",
+        )
+        summary = _summarise(log)
+        assert summary["composition"] == {"lemma": 1, "multiword": 1, "proper": 1}
+        # The lemma figure must not be dragged down by the other two.
+        assert summary["outcomes_for_lemmas"] == {"complete": 1}

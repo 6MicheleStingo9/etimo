@@ -32,6 +32,7 @@ the entry in flight and nothing else, and that the file is never rewritten at
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 import time
@@ -59,6 +60,50 @@ from etimo.wiktionary import (  # noqa: E402
 
 DEFAULT_CORPUS = ROOT / "tools" / "validation" / "corpus_catalog.json"
 DEFAULT_OUTPUT = ROOT / "tools" / "validation" / "corpus-survey.jsonl"
+
+
+def _shape(word: str) -> str:
+    """A rough grammatical class, read from the shape of the title alone.
+
+    Not a linguistic judgement — a way of reporting what a partial survey has
+    actually looked at. The three non-lemma classes behave quite differently
+    from lemmas and would distort any figure quoted without them:
+
+      multiword    `a caldo`, `alla luce del sole` — a phrase has no etymon,
+                   it has a history as a phrase, and Wiktionary rarely writes
+                   one an Etymology section
+      proper       `Acquappesa`, `Abbattista` — a surname descends by a
+                   mechanism (place → family) that `{{surname}}` does not
+                   express as a relation
+      affix        `-mente`, `pre-` — prefixes and suffixes
+    """
+    if " " in word or "'" in word.strip("'"):
+        return "multiword"
+    if word.startswith("-") or word.endswith("-"):
+        return "affix"
+    if word[:1].isupper():
+        return "proper"
+    return "lemma"
+
+
+def _survey_order(word: str) -> str:
+    """A stable, non-alphabetical position for an entry.
+
+    The survey walks a corpus of 127101 in slices over weeks, so every figure
+    it reports before finishing is a figure about its prefix. In alphabetical
+    order that prefix is not a sample of anything: Italian puts its adverbial
+    locutions under «a» — `a caldo`, `alla moda`, `a gambe all'aria`, because
+    they are governed by a preposition — and its toponyms under `Acqua-`,
+    `Alb-`, `Alt-`. The first 6805 entries surveyed were 6295 «a» words, 15%
+    of them phrases, and reported 45.7% of the corpus as unreadable when the
+    true figure for lemmas is 31.6%.
+
+    Hashing the title scatters the walk deterministically: the same order every
+    time, resumable, and any prefix of it is a fair sample of the whole. The
+    problem was never in the sampling — it was that nobody chose a sampling at
+    all, and alphabetical order came for free with a structure inside it.
+    """
+    return hashlib.sha256(word.encode("utf-8")).hexdigest()
 
 
 def _load_corpus(path: Path) -> list[dict[str, Any]]:
@@ -243,6 +288,10 @@ def _summarise(path: Path) -> dict[str, Any]:
     anchored = 0
     with_forms = 0
     unanchored_examples: list[str] = []
+    shapes: Counter[str] = Counter()
+    by_shape: dict[str, Counter[str]] = {
+        name: Counter() for name in ("lemma", "multiword", "proper", "affix")
+    }
     with path.open(encoding="utf-8") as handle:
         for line in handle:
             try:
@@ -254,6 +303,8 @@ def _summarise(path: Path) -> dict[str, Any]:
             steps_total += int(row.get("steps") or 0)
             for name in row.get("terminals", []):
                 terminals[name] += 1
+            shapes[_shape(row.get("word", ""))] += 1
+            by_shape[_shape(row.get("word", ""))][row.get("outcome", "?")] += 1
             if row.get("forms_drawn"):
                 with_forms += 1
                 if row.get("anchored"):
@@ -275,6 +326,12 @@ def _summarise(path: Path) -> dict[str, Any]:
         "with_forms": with_forms,
         "anchored_percent": round(100 * anchored / with_forms, 2) if with_forms else 0.0,
         "unanchored_examples": unanchored_examples,
+        # What has actually been looked at. A figure quoted without this is a
+        # statement about a slice dressed as a statement about the corpus:
+        # phrases and proper nouns behave nothing like lemmas and were never
+        # part of the population the audit was scoped to.
+        "composition": dict(shapes.most_common()),
+        "outcomes_for_lemmas": dict(by_shape["lemma"].most_common()),
     }
 
 
@@ -312,7 +369,10 @@ def main() -> int:
 
     corpus = _load_corpus(args.corpus)
     done = _already_done(args.output)
-    pending = [item for item in corpus if item.get("word") not in done]
+    pending = sorted(
+        (item for item in corpus if item.get("word") not in done),
+        key=lambda item: _survey_order(item.get("word", "")),
+    )
 
     print(
         f"corpus {len(corpus)} · surveyed {len(done)} · remaining {len(pending)}",
@@ -372,6 +432,31 @@ def main() -> int:
             "source had written. This is not a claim that the etymologies are "
             "right, which is Wiktionary's business; it is the claim that the "
             "tool reported what the source says.",
+            "",
+            "### What has been looked at",
+            "",
+            "Percentages below are of this composition, not of the corpus. "
+            "Phrases (`a caldo`), proper nouns (`Acquappesa`) and affixes "
+            "behave nothing like lemmas and were never in the population the "
+            "audit is scoped to.",
+            "",
+            "| shape | count |",
+            "|---|---:|",
+            *(
+                f"| `{name}` | {count} |"
+                for name, count in summary["composition"].items()
+            ),
+            "",
+            "### Outcomes for lemmas only",
+            "",
+            "| outcome | count |",
+            "|---|---:|",
+            *(
+                f"| `{name}` | {count} |"
+                for name, count in summary["outcomes_for_lemmas"].items()
+            ),
+            "",
+            "### Outcomes across everything surveyed",
             "",
             "| outcome | count | meaning |",
             "|---|---:|---|",

@@ -5,8 +5,9 @@ Written for whoever opens this branch after weeks away — which, from September
 sporadically, and they run until their quota is spent. **The conversation does
 not survive; this file does.**
 
-Read this first, then `tools/validation/README.md` for how the audit works and
-`ANALYSIS.md` for what was measured when.
+Read this first, then `tools/validation/README.md` for how the audit works,
+`tools/validation/READING.md` for what a Wiktionary etymology section actually
+says and how the seed was chosen, and `ANALYSIS.md` for what was measured when.
 
 ---
 
@@ -120,10 +121,32 @@ format of the one file that must survive between sessions, and doing that at
 the end of a long session is how a persistent store gets corrupted. Do it
 first thing in a session, with the ledger backed up, or not at all.
 
-**5. The survey's anchoring figure starts from zero.** The first 6805 entries
+**5. The first 6805 survey rows are alphabetical.** They were walked before
+the order was scattered, so they are «a» words and not a sample. `--summary`
+now reports composition and a lemma-only breakdown, which makes them readable;
+re-running them would cost little, since their pages are cached.
+
+**6. The survey's anchoring figure starts from zero.** The first 6805 entries
 were surveyed before anchoring existed and do not carry it. Either let the
 figure build from the entries surveyed since, or re-run those 6805 — cheap,
 since their pages are cached.
+
+**6. The survey's running percentages are not corpus figures, and must not be
+read as any.** It walks in alphabetical order, and Italian sorts by grammatical
+class: adverbial locutions are headed by a preposition and the commonest is
+`a`, affixes sort under `-`, proper nouns under an initial capital. The first
+6805 entries ran from `'` to `ammannare` and were 15.5% locutions and 9.8%
+proper nouns — three and five times their share of the corpus — both classes
+excluded from the agreed population, and both correctly yielding no chain
+almost always. That slice reports 45.7% "no chain"; on its lemmas alone the
+figure is 31.6%, of which only **3.1%** is a gap in our reading rather than an
+absent section.
+
+The remedy is not to resample. It is that **the survey must report the
+composition of what it surveyed alongside its outcomes** — an outcome without
+its denominator is a statement about a letter of the alphabet dressed as a
+statement about the corpus. See `tools/validation/READING.md`, "What was
+excluded from the population".
 
 ---
 
@@ -132,11 +155,20 @@ since their pages are cached.
 Written here because it cost a great deal and reads as pedantry until it
 happens to you.
 
-**A check that verifies an absence fails in one direction only.** Eighteen
-corrections were made to the measuring instruments; eight of them accused
-working code, and not one ever excused a defect. Every gap in such an
-instrument becomes an accusation and no gap becomes an acquittal. **When a
-measurement says the code is wrong, check the measurement first.**
+**A check that verifies an absence fails in one direction only.** Nineteen
+corrections were made to the measuring instruments; nine of them accused
+something that was working, and not one ever excused a defect. Every gap in
+such an instrument becomes an accusation and no gap becomes an acquittal.
+**When a measurement says the code is wrong, check the measurement first.**
+
+The nineteenth is the clearest of them and took fifteen minutes to notice: an
+extractor returned an empty list both when a page's Italian section had no
+Etymology heading **and when the network request failed**, and printed the same
+label for both. Three entries that do have etymologies were recorded as having
+none. A failure of the instrument had disguised itself as a fact about the
+source — which is the same direction as all the others. **A tool must be able
+to say "I could not look" in words it cannot confuse with "there is nothing
+there."**
 
 **A check built on the parser's tables cannot find an error in those tables.**
 It reads the source with the same incomplete list and agrees with itself. This
@@ -156,6 +188,25 @@ factor, so every interesting entry landed in one category and two rounds went
 to fixing a defect that was not there. An unintended structure in how a sample
 is built becomes an apparent structure in the result — and a modulus is worse
 than a ranking, because a ranking is visibly an order.
+
+**And beware the one nobody built.** This has now happened three times: a
+sample taken from the head of a relevance ranking, the synthetic corpus above,
+and the corpus survey's alphabetical walk. The third is the worst, because no
+one chose it — reading a corpus in the order it is stored is the default, and
+in Italian that order is correlated with grammatical class. Nothing had to be
+constructed badly for the result to mislead.
+
+**An order you did not choose is still a sampling.** The survey walked the
+corpus alphabetically — nobody decided that, it came free with the file — and
+Italian's alphabet is correlated with grammatical class: `a` is where the
+adverbial locutions live (`a caldo`, `alla moda`, governed by a preposition),
+capitals are where the toponyms live, `-` is where the affixes live. The first
+6805 entries were 6295 «a» words and reported 45.7% of the corpus as
+unreadable, where the figure for lemmas is 31.2%. The walk is now scattered by
+a hash of the title, so any prefix of it is a fair sample; and every figure is
+reported beside the composition it was measured on. **A figure without its
+denominator is a statement about a slice dressed as a statement about the
+corpus.**
 
 **A class at 0.3% cannot be sampled.** Sixty random entries held one. Rare
 classes are chased by name, not estimated.
