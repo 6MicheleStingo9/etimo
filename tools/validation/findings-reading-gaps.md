@@ -95,12 +95,40 @@ Sub-classes worth separating, because they are not all descent:
 | plain derivation | `From {{m|it|abside}}` | a link |
 | compound written by hand | `{{m|it|acqua}} + {{m|it|ragia}}` | a formation, like `{{af}}` |
 | conjectured | `Probably derived from {{m|it|cagione}}` | a hypothesis, not a link |
-| grammatical form | `Feminine of {{m|it|alunno}}`, `Unsuffixed past participle of {{m|it|accostare}}` | **not a descent** — a form of the same lemma |
+| grammatical form | `Feminine of {{m|it|alunno}}` | **not a descent** — a form of the same lexeme |
 | acronym expansion | `acmonital`, `aennino` | excluded population anyway |
 
 The fourth row matters: `alunna` is not *descended from* `alunno`, it is the
-feminine of it. Drawing that as an ancestor would be a new error of the exact
-kind this project exists to avoid.
+feminine of it — *mozione*, fully regular gender inflection, the same lexeme.
+Drawing that as an ancestor would be a new error of the exact kind this project
+exists to avoid.
+
+**The test is whether the governing phrase names a different lexeme or another
+form of the same one.**
+
+```
+DIFFERENT LEXEME → derivation, draw it
+   From · Derived from · Reformed from
+   Deverbal of                  acciuffare ← ciuffo,  accosto ← accostare
+   Diminutive/Augmentative of   Italian alterati are lemmas in their own right
+   Clipping of                  when lexicalised: porno ← pornografia
+
+SAME LEXEME → not a descent
+   Feminine of · Masculine of   mozione
+   Plural of · Singular of      inflection
+   Past participle of           when it is the verb form, not a deverbal noun
+   Alternative form/spelling of · Apocopic form of · Syncopated form of
+```
+
+`accosto` sits on the near side of that line and an earlier draft of this
+document put it on the far side. It carries `{{it-deverbal|accostare}}` and is
+a deverbal **noun** — a distinct lexeme. «Unsuffixed past participle of»
+describes the *mechanism* of the derivation (the form taken is the participle's,
+with no suffix added), not that the word is an inflected form.
+
+The last line connects to the fourteen variants in §3: same lexeme, so **no
+link from the variant to its main form** — but the pointer should be followed
+to reach that form's chain. Two behaviours, both correct, neither a link.
 
 ## 2. The source names a language and withholds the form — 10 entries
 
@@ -147,19 +175,31 @@ inside it:
 
 ```
 agnellino       From {{af|it|agnello|-ellino}} or {{af|it|agnello|-ino}}.
-acquattamento   From {{suffix|it|acquattare|mento}} or {{suffix|it|acquattarsi|mento}}.
 allotropia      From {{af|it|allo-|-tropia}} or {{af|it|allotropo|-ia}}.
+acquattamento   From {{suffix|it|acquattare|mento}} or {{suffix|it|acquattarsi|mento}}.
 ```
 
-In the first two the analyses **disagree about the suffix and agree about the
-base**. `agnellino` comes from `agnello` under either reading. Recording both
-as hypotheses and drawing nothing discards a fact the entry asserts twice.
-
-`allotropia` is where the caution is right: the two analyses share no form.
+In `agnellino` the analyses **disagree about the suffix and agree about the
+base**: it comes from `agnello` under either reading. Recording both as
+hypotheses and drawing nothing discards a fact the entry asserts twice. In
+`allotropia` the caution is right — the two analyses share no form at all.
 
 **The rule, which needs no judgement call**: a form appearing in *every*
 competing analysis is asserted by the entry and may be drawn. A form appearing
 in some but not all may not.
+
+**But it needs one qualification, and `acquattamento` is why.** Its two
+analyses differ in the base (`acquattare` / `acquattarsi`, the plain and
+reflexive forms of one verb) and agree in the suffix. Intersecting the strings
+therefore yields `mento` — the *affix*. That is true and useless: an affix is a
+component of a formation, not an ancestor, and drawing it would assert nothing
+about descent.
+
+So: **the intersection must contain at least one base — a form that is not an
+affix — before it is worth drawing.** Under that qualification `agnellino`
+draws `agnello`, and both `allotropia` and `acquattamento` correctly stay
+silent. That the two bases of `acquattamento` are the same verb is true and
+outside what a parser can know.
 
 ---
 
