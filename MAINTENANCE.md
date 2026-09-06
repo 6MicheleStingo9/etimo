@@ -22,9 +22,19 @@ Nearly every defect found so far surfaced because one session tripped over the
 other's error. When one of them opined on the other's ground, it added nothing
 the other had not already seen better.
 
-Reaching the peer: `ListAgents`, then `SendMessage`. **The name changes between
-activations** — it has been «Etimo - Linguist», «area-3d», «area-5a». Identify
-yourself and state the subject; a wrong session will say so.
+Reaching the peer: `ListAgents`, then `SendMessage`. **The name tells you
+nothing about what a session works on.** In a multi-root workspace the name is
+derived from the *first* folder in the list — here `area` — so sessions called
+`area-*` may be on any project, and the peer has answered to «Etimo -
+Linguist», «area-3d», «area-5a», «area-91» on different days.
+
+So: open with one line identifying yourself and asking whether it is the right
+session, and give a recognition token before the substance. `brindare` as a
+negative case, `cavolo` and `pizza` annotated as overdetermined, the seven
+candidates rejected while looking for a conditioning guard — no other session
+holds those. Four wrong addresses were tried on 6 September before finding the
+peer; each answered honestly and quickly, which is the reason to ask first and
+explain second.
 
 ---
 
