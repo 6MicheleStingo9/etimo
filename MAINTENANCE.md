@@ -29,13 +29,57 @@ derived from the *first* folder in the list — here `area` — so sessions call
 `area-*` may be on any project, and the peer has answered to «Etimo -
 Linguist», «area-3d», «area-5a», «area-91» on different days.
 
-So: open with one line identifying yourself and asking whether it is the right
-session, and give a recognition token before the substance. `brindare` as a
-negative case, `cavolo` and `pizza` annotated as overdetermined, the seven
-candidates rejected while looking for a conditioning guard — no other session
-holds those. Four wrong addresses were tried on 6 September before finding the
-peer; each answered honestly and quickly, which is the reason to ask first and
-explain second.
+The prefix will change again: Michele is restructuring the workspace, so the
+folder the names derive from will not be `area`. **Expect to have to ask.**
+
+**The passphrase.** Open with one line and nothing else:
+
+> Working on etimo. Countersign: **tre bisacce**?
+
+The right session answers **`τραπεζὰκιον`** — the word `Trebisacce` actually
+comes from, where the entry says the «three saddlebags» reading is a
+corruption. Anyone can read that pair here; the point is not secrecy but
+address resolution, and no session that has not worked on this project has any
+reason to be holding this file open.
+
+If the answer is wrong or absent, it is the wrong session — say thank you and
+try the next. Four wrong addresses were tried on 6 September; each answered
+honestly and quickly, which is the argument for asking in one line and
+explaining afterwards.
+
+---
+
+## How work is proposed and accepted
+
+From September 2026, **all development on this branch goes through issues and
+pull requests**. The two of us govern it: we open the issues, assign them, and
+review what comes back — the point being that specific pieces can be handed to
+other sessions without either of us holding the whole picture in a context that
+will not survive the week.
+
+| | |
+| --- | --- |
+| `main` | the released tool. No direct commits, no automation. |
+| `prog_validation/…` | development. Human and agent changes arrive by pull request. |
+
+**One exception, and it is not negotiable:** the two workflows commit the ledger
+and the survey log to this branch every night, directly. That is why branch
+protection forbids force-pushes and deletion but does not require review — a
+mandatory-review rule would stop the audit dead. The bot's commits are data,
+not development; they are `[skip ci]` and touch only
+`tools/validation/*.json` and `corpus-survey.jsonl`.
+
+**Labels carry the perimeter.** `area: code` is the developer session's to
+decide, `area: language` the linguist's. `needs measurement` means exactly
+that: this project has been wrong often enough by estimating that an unmeasured
+change is not accepted, however obvious it looks.
+
+A pull request is expected to say **what it does not establish**. `etimo` never
+presents a limit of the tool as a fact about the language; a pull request that
+claims more than it verified is the same mistake in another medium.
+
+When the system reaches a v2, Michele may ask for a merge request onto `main`.
+Until then `main` moves only when the tool itself is released.
 
 ---
 
@@ -169,6 +213,13 @@ none. A failure of the instrument had disguised itself as a fact about the
 source — which is the same direction as all the others. **A tool must be able
 to say "I could not look" in words it cannot confuse with "there is nothing
 there."**
+
+`etimo` itself keeps those two apart carefully — it is most of what the terminal
+vocabulary is for, and the project's governing principle rests on it. The
+extractor that confused them was written to *measure* how well the program keeps
+them apart. **A measuring instrument does not inherit the guarantees of the code
+it measures**, and neither does anything else written around the program: a
+workflow, a query, a summary line.
 
 **A check built on the parser's tables cannot find an error in those tables.**
 It reads the source with the same incomplete list and agrees with itself. This

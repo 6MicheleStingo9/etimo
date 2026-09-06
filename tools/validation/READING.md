@@ -97,7 +97,10 @@ not take.
 ## What was excluded from the population, and why the reason is linguistic
 
 The agreed population is **102 692** entries: the 129 650 Italian lemmas less
-four classes. The exclusions are not tidiness — each names a class whose
+four classes. (A crude shape-based classifier — spaces, apostrophes, leading
+capitals, leading hyphens — run over the corpus catalogue counts 101 378, a
+1.3% disagreement with the category-based exclusion. Two methods sharing
+nothing, which is the only kind of agreement worth anything.) The exclusions are not tidiness — each names a class whose
 "etymology" is a different kind of object.
 
 | excluded | why |
@@ -114,12 +117,27 @@ Affixes sort under `-`. Toponyms and surnames carry an initial capital, which in
 most collations sorts them apart as well.
 
 So a walk through the corpus in alphabetical order does **not** meet these
-classes at a steady rate: it meets nearly all the locutions in one stretch, all
-the affixes in another. The first 6 805 entries of the corpus survey were 15.5%
-locutions and 9.8% proper nouns, against roughly 3% and 6% in the corpus at
-large, and their outcomes were 93% and 73% "no chain" for entirely correct
-reasons. Read as a corpus figure, that slice reported 45.7% "no chain"; the
-true lemma figure in the same slice is 31.6%.
+classes at a steady rate. Measured on the first 6 805 entries of the corpus
+survey, which ran from `'` to `ammannare`:
+
+| | in that slice | in the whole corpus | |
+| --- | ---: | ---: | ---: |
+| lemmas | 68.6% | 79.7% | |
+| locutions | 15.5% | 8.4% | 1.8× |
+| affixes | 6.0% | 0.7% | **8.6×** |
+| proper nouns | 9.8% | 11.2% | 0.9× |
+
+The affixes are the sharpest distortion and the least expected: `-` sorts
+before every letter, so a single stretch at the very start of the walk holds
+two fifths of every affix in the corpus. The proper nouns, which looked like
+the obvious culprit, are in fact slightly *under*-represented — the A- toponyms
+are numerous but no more so than elsewhere.
+
+Locutions and proper nouns yielded "no chain" 93% and 73% of the time, for
+entirely correct reasons. So, read as a corpus figure, that slice reported
+45.7% "no chain". The true lemma figure in the same slice is **31.6%**, of
+which 28.6% is an absent section and only **3.1%** — about 3 100 entries
+projected over the corpus — is a gap in our reading.
 
 **A survey outcome must always be reported next to the composition of what it
 surveyed.** Without the denominator it is a statement about a letter of the
