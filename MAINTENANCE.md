@@ -62,6 +62,11 @@ will not survive the week.
 | `main` | the released tool. No direct commits, no automation. |
 | `prog_validation/…` | development. Human and agent changes arrive by pull request. |
 
+**Michele merges.** The two of us open issues, write pull requests and review
+them; the merge button is his, on every pull request, without exception —
+stated 6 September, after a session tried to merge its own. A pull request is a
+proposal, and it stays open until he takes it.
+
 **One exception, and it is not negotiable:** the two workflows commit the ledger
 and the survey log to this branch every night, directly. That is why branch
 protection forbids force-pushes and deletion but does not require review — a
