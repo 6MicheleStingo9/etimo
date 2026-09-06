@@ -97,18 +97,69 @@ not take.
 ## What was excluded from the population, and why the reason is linguistic
 
 The agreed population is **102 692** entries: the 129 650 Italian lemmas less
-four classes. (A crude shape-based classifier — spaces, apostrophes, leading
-capitals, leading hyphens — run over the corpus catalogue counts 101 378, a
-1.3% disagreement with the category-based exclusion. Two methods sharing
-nothing, which is the only kind of agreement worth anything.) The exclusions are not tidiness — each names a class whose
+four classes. A crude shape-based classifier — spaces, apostrophes, leading
+capitals, leading hyphens — counts 101 378 over the corpus catalogue, 1.3%
+below it. **That agreement is worth less than it looks**, because the two
+methods disagree in both directions and the errors partly cancel: the shape
+classifier drops 927 affixes the agreed population keeps, and keeps the
+lowercase acronyms (`abc`, `acmonital`, `aennino`) the agreed population drops.
+Uppercase acronyms happen to fall under its initial-capital rule, for the wrong
+reason. Use it to sort a survey slice, not to state a population size. The exclusions are not tidiness — each names a class whose
 "etymology" is a different kind of object.
 
 | excluded | why |
 | --- | --- |
-| **multiword terms** | a locution has a phrase history, not an etymon. `a gambe all'aria` is not *descended* from anything; it was *coined* from words that each have their own descent. Wiktionary rarely writes them a section, and rightly. |
+| **multiword terms** | mostly: a locution has a phrase history, not an etymon. But see below — the exclusion is right for the majority and wrong as a blanket. |
 | **proper nouns** | toponyms and surnames descend by a mechanism the relation templates do not express — place name → family name → given name. `{{surname}}` and `{{place}}` state a category, not an ancestry. |
 | **acronyms and abbreviations** | the "source" of `acmonital` is an expansion (*acciaio monetario italiano*), not an etymon. The relation is spelling to phrase, and it runs in the opposite direction from descent. |
 | **inflected forms** | they resolve to their lemma; counting them counts the lemma twice. |
+
+### Multiword terms are two classes, and only one of them is rightly excluded
+
+They do carry Etymology sections far more often than the exclusion implies:
+**44.1%** of the locutions in the first survey slice had one. But most of those
+sections are not etymologies.
+
+```
+toccare il fondo         {{lit|to touch the bottom}}. Compare {{cog|fr|toucher le fond}}.
+fare un buco nell'acqua  {{lit|to make a hole in the water}}.
+a fior di pelle          {{lit|at surface of skin}}. Compare {{cog|fr|à fleur de peau}}.
+```
+
+`{{lit}}` is a **literal gloss**: it says what the phrase means word for word,
+not where it came from. It lives in the Etymology section because there is
+nowhere else to put it. A tool reading that section finds a template it cannot
+interpret and is right not to — but it must not record the entry as *silent*,
+because the entry spoke and said something else.
+
+The `{{cog|fr|…}}` alongside is a **calque comparison**, not a derivation: the
+entry is noting that French has the same figure, without claiming which came
+first. Correctly not an ancestor.
+
+But a minority are ordinary etymologies, because the phrase was **borrowed as a
+single block**:
+
+```
+a posteriori   {{lbor|it|la-med|ā posteriōrī}}
+buona fede     From {{inh|it|la|bona fides}}.
+ping pong      {{ubor|it|en|ping pong}}
+ad personam    {{bor+|it|la|ad persōnam}}
+```
+
+These have a genuine etymon — one foreign phrase — and behave exactly like a
+one-word lemma. In a cached sample of 55 locutions with a section, **4 (7%)**
+were of this kind.
+
+**The test is not whether the term has a space in it.** It is whether the
+section carries a relation template. A locution formed in Italian has no
+etymon and nothing to draw; a locution borrowed whole has both. Excluding them
+by shape excludes the second kind for a property it does not have.
+
+The class is small — on these figures, of the order of 300 entries across the
+corpus — and it is the least urgent thing on the list. But it should be
+excluded by what its section says, not by its spelling.
+
+---
 
 **This matters for any measurement taken in alphabetical order.** Italian
 adverbial locutions are overwhelmingly headed by a preposition, and the
