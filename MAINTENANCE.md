@@ -62,6 +62,19 @@ will not survive the week.
 | `main` | the released tool. No direct commits, no automation. |
 | `prog_validation/…` | development. Human and agent changes arrive by pull request. |
 
+**What goes through an issue and a pull request: functional code.** The files
+the two of us keep in order to organise ourselves do not — `MAINTENANCE.md`,
+`ANALYSIS.md`, `tools/validation/READING.md`,
+`tools/validation/findings-reading-gaps.md`. Commit those straight to this
+branch. Michele set this on 6 September, after four pull requests in one day
+turned out to change nothing but `.md`: a pull request is a proposal about the
+tool, and asking him to review our own notes wastes his attention on the one
+thing he delegated.
+
+`README.md` is not in that list. It documents the tool to its users, and
+`tools/check_readme_examples.py` tests it — it changes with the code and goes
+through a pull request with it.
+
 **How an issue gets executed, from September 2026.** Read the repository
 first — the open issues and their comments say what is live and what class it
 is. Then hand one issue to a subagent with the `Agent` tool, **one issue at a
