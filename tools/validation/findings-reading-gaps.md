@@ -65,7 +65,28 @@ accapigliarsi  From {{m|it|capegli}}, older form of {{m|it|capelli}}.
 ```
 
 The prose carries the relation; the `{{m}}` carries the form. These are
-unambiguous Italian derivations and none of them reaches the tree.
+unambiguous Italian derivations, and the link is never drawn.
+
+**The text does reach the user**, though — an earlier draft of this document
+said it did not, and that was overstated:
+
+```
+$ etimo absidiola
+absidiola (it)
+└─ ? etymology not interpreted
+   the entry says: «From abside.»
+```
+
+Which makes this the project's own invariant firing: *if the program can write
+a note that contradicts its own tree, the tree is wrong.* The node says
+`etymology not interpreted`; the note beneath it names the relation the node
+denies having.
+
+It also means **the population is identifiable from output alone** — a node
+whose terminal is `not_interpreted` and whose note carries a governing phrase
+followed by a form. No source-side pattern is needed, so the check cannot
+inherit the parser's own blind spots, and it cannot repeat the error of
+reasoning about behaviour from the source instead of observing it.
 
 **Why editors write it this way, and why it will not go away.** It is a gap in
 Wiktionary's own template vocabulary, not a house style. `{{inh}}`, `{{bor}}`
