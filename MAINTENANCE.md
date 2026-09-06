@@ -73,6 +73,25 @@ subagents live inside this session, spend its quota, and die with it. They are
 not peers. Nothing they hold survives, so anything they establish has to be in
 the issue, the branch or the pull request before the session ends.
 
+**Two lines that go into every brief, verbatim.** They are the discipline this
+project already runs on, and a subagent holding one issue cannot arrive at
+them on its own — it sees fifty-two entries that "do not work", has no reason
+to suspect its own instrument, and its quota ends before the doubt does.
+
+> If your measurement says the code is wrong, **run the code** and read the
+> output before concluding. State a claim about behaviour against the output,
+> never against the source alone.
+>
+> If a case handed to you as a defect turns out to work, **say so and stop.**
+> Do not widen the task to make it fail.
+
+The second matters more than the first. Issue #10 was filed as a defect and
+was not one; it was checked and closed. Without that check, `accosto` — which
+already prints `deverbal of → accostare` — would have been silenced by a fix
+written to repair it. Twenty corrections have been made to the measuring
+instruments here and eighteen accused something that was working. None has
+ever excused a defect.
+
 **Michele merges.** The two of us open issues, write pull requests and review
 them; the merge button is his, on every pull request, without exception —
 stated 6 September, after a session tried to merge its own. A pull request is a
@@ -152,6 +171,45 @@ here. `main` takes no automated commits.
 ---
 
 ## Open, in the order I would take them
+
+**The issues are the live list; what follows is background.** Every item below
+is now an issue, with the measurements and the counter-examples that were
+added after this section was written. Read the issues and their comments
+first — several of the numbers here are superseded, and one entry appears
+twice under «6».
+
+**The agreed order, settled 6 September with the linguist session:**
+
+> **#12, then #1, then #9, then #11.**
+
+**#12 first**, and not only because it produces the count #9 needs. Today
+`not_interpreted` holds entries whose correct treatment is *to change
+nothing* — onomatopoeia, internationalisms, `{{lit}}` glosses, sections of
+cognates only. Start #9 before that separation and whoever takes it receives a
+queue in which most entries should be left alone, under a title saying they
+should be read. **The pressure of the task is to make them produce something**,
+which is how the fix for one defect introduces another. That is `Trebisacce`.
+
+**#1 before #9, not after.** They look far apart — a known defect on ten to
+fifteen entries against a class of fifty-two — but they read the same object:
+`readable_lead_in`, the text standing before a template in
+`_forms_from_etymology`. #1 decides when that text makes a claim conditional;
+#9 decides when it licenses a bare `{{m}}` as a relation. Both would add a
+branch to the same chain over the same string, at the same position in the
+same loop. #1 is also the one that will change how the lead-in is *segmented*
+— «Another theory, advanced by Jasanoff, suggests that…» turns on clause
+boundaries inside the lead-in, and `suggests` is not in `_CONDITIONING` today.
+#9 depends on that segmentation to mean «the phrase immediately before».
+Taking #9 first is writing against a shape #1 is about to change.
+
+**Nothing on the language side unblocks by reordering.** The linguist's
+figures — 40.6%, 3.1%, the projection to ~3100 — all come from the alphabetical
+head of the survey and are upper bounds. The remaining half of #5 is
+re-classifying on a representative slice, and it cannot start until the survey
+has walked far enough in the scattered order. That is time, not work.
+
+---
+
 
 **1. The xfail on `dō`.** A theory attributed to a named scholar is read as
 asserted: «Another theory, advanced by Jasanoff, suggests that…» enters the
