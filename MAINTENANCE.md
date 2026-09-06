@@ -106,7 +106,21 @@ mid-analysis. Unmeasured: the operational health of the runs across time,
 whether the cache key defeats itself (it uses `github.run_id`, unique per run,
 so it may always be missing and falling back), and the growth of the ledger.
 
-**4. The survey's anchoring figure starts from zero.** The first 6805 entries
+**4. The ledger carries 53 MB of nothing.** 125087 of its 127199 entries have
+never been audited: rows saying "this word exists and we have not looked at
+it", which the corpus already says. GitHub warns on every push (66 MB against a
+50 MB recommendation) and a fully audited ledger would reach 67 MB — under the
+100 MB hard limit, so nothing breaks, but 53 MB of empty rows are committed
+every night.
+
+The fix is to persist only entries that have a state and derive the rest from
+the corpus at load time: 1.1 MB today, growing with coverage rather than
+starting at the maximum. It was left undone deliberately — it changes the
+format of the one file that must survive between sessions, and doing that at
+the end of a long session is how a persistent store gets corrupted. Do it
+first thing in a session, with the ledger backed up, or not at all.
+
+**5. The survey's anchoring figure starts from zero.** The first 6805 entries
 were surveyed before anchoring existed and do not carry it. Either let the
 figure build from the entries surveyed since, or re-run those 6805 — cheap,
 since their pages are cached.
