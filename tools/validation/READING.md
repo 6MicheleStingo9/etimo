@@ -60,6 +60,12 @@ ancestry of A and are not in doubt — the entry is saying *if* it came from A,
 then the rest follows. Spreading the marker over the whole sentence throws away
 a chain the source asserted.
 
+The comma releases the marker when it introduces the next chain link or
+brackets an appositive: «A, from B» and «A, of uncertain origin, with
+suppletion from B» do not hedge B. A comma immediately before `or`, `and/or`,
+`or alternatively` or `or else` is different: it coordinates competing
+alternatives, so the marker still covers both («probably from A, or from B»).
+
 The converse trap: in «Probably from A. Compare B», the marker never reaches B
 at all, because B is a comparison and was never a candidate ancestor.
 

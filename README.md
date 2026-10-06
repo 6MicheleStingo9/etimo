@@ -593,6 +593,11 @@ Consequences, each deliberate:
   proposal. Walking X would substitute a conjecture for the source's verdict.
 - **A form cited for comparison is not an ancestor.** *«Compare German Bank»* is
   a remark.
+- **A proposal qualifies its candidate, not its attribution.** *«Jasanoff
+  suggests…»* is a proposal; *«According to Ernout-Meillet, from X»* is not.
+  Its scope ends at a sentence boundary or at a comma introducing the next
+  chain link, but a comma immediately before *or*, *and/or*, *or alternatively*
+  or *or else* keeps uncertainty across the competing alternatives.
 - **Convergent branches are not an error.** Where a compound's components share
   an ancestor, the second reads `already shown above`.
 - **Unparsed prose is printed, not discarded.**
@@ -647,11 +652,6 @@ optimisation, not a dependency.
   merged histories are represented as trees and lose detail.
 - **Step order is inferred** from the order of mention in the source. This is
   correct for *«from X, from Y»* and may be wrong for less regular phrasings.
-- **A proposal attributed to a named scholar is read as asserted.** *«Another
-  theory, advanced by X, suggests…»* enters the chain rather than the list of
-  proposals. The qualifying markers cover *possibly*, *perhaps*, *probably* and
-  their kin, and not the forms an entry uses to attribute a hypothesis to
-  someone.
 - **Coverage is Wiktionary's**, and is uneven on technical, regional and recent
   vocabulary.
 

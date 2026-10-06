@@ -13,6 +13,19 @@
     }
   },
   {
+    "word": "menzogna",
+    "language": "it",
+    "category": "conditioned-prose",
+    "why": "The entry offers mentio and mentiō as uncertain competing etymons: «probably from a crossing of mentio …, or derived from mentiō». The comma before «or» coordinates the alternatives rather than releasing the proposal marker. This is the clean regression guard: one marker, one comma, one «or», with no second mechanism holding mentiō back.",
+    "manual_review": false,
+    "expected": {
+      "must_include_relations": ["inherited"],
+      "must_include_forms": ["*mentionia::la-vul"],
+      "must_include_hypotheses": ["mentio::la", "mentiō::la-lat"],
+      "must_not_include_forms": ["mentio::la", "mentiō::la-lat"]
+    }
+  },
+  {
     "word": "dipelare",
     "language": "it",
     "category": "conditioned-prose",

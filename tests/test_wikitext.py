@@ -581,6 +581,35 @@ class TestConditioningMarkers:
         assert [s.forms[0].lemma for s in analysis.steps] == ["caulis"]
         assert [h.form.lemma for h in analysis.hypotheses] == ["cavolo"]
 
+    def test_a_comma_releases_the_marker_for_the_next_chain_link(self):
+        analysis = parse(
+            "Possibly from {{inh|it|la|cavolo}}, from "
+            "{{inh|it|la|caulis}}, from {{inh|it|la|caulis2}}.",
+            "it",
+        )
+        assert [s.forms[0].lemma for s in analysis.steps] == ["caulis", "caulis2"]
+        assert [h.form.lemma for h in analysis.hypotheses] == ["cavolo"]
+
+    @pytest.mark.parametrize(
+        "coordinator", ["or", "and/or", "or alternatively", "or else"]
+    )
+    def test_a_comma_before_an_alternative_keeps_the_marker(self, coordinator):
+        analysis = parse(
+            "Probably from {{inh|it|la|cavolo}}, "
+            f"{coordinator} from {{{{inh|it|la|cavulu}}}}.",
+            "it",
+        )
+        assert analysis.steps == []
+        assert [h.form.lemma for h in analysis.hypotheses] == ["cavolo", "cavulu"]
+
+    def test_an_appositive_uncertainty_does_not_reach_the_next_link(self):
+        analysis = parse(
+            "From {{inh|it|la|andāre}}, of uncertain origin, with suppletion "
+            "from {{inh|it|la|ambulāre}}.",
+            "it",
+        )
+        assert [s.forms[0].lemma for s in analysis.steps] == ["andāre", "ambulāre"]
+
     def test_the_certain_part_of_a_mixed_entry_survives(self):
         # `cavolo`: two asserted links, then two candidates for a stage.
         analysis = parse(
@@ -897,37 +926,6 @@ class TestSynchronicMarkersAndTheirLookalike:
         ]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="known defect: a theory attributed to a named scholar is read as an "
-    "asserted step. `dō` says «Another theory, advanced by the linguist Jay H. "
-    "Jasanoff, suggests that the form derives from *dowjō», and *dowjō joins "
-    "the chain as though the entry had claimed it. The conditioning markers "
-    "cover possibly/perhaps/probably/maybe/apparently/alternatively and none "
-    "of the ways an entry attributes a proposal to someone. Found because the "
-    "reserve began carrying it across pages and `tradito` reported the two as "
-    "disagreeing — the note was false, the step underneath it was too. Left "
-    "for a decision on _CONDITIONING, which governs what counts as asserted "
-    "and is not a thing to widen at the end of a day.\n\n"
-    "Whoever takes it on: the marker is the **verb**, not the attribution. A "
-    "name can qualify or support — «Jasanoff suggests» proposes, «According "
-    "to Ernout-Meillet, from X» cites in support — and it is the verb that "
-    "says which. Measured on Italian entries, `according to` appears in 2498 "
-    "pages and 0 of 20 sampled had it in an Etymology section, so it earns "
-    "nothing and risks demoting settled etymologies. Candidates worth having: "
-    "suggests, proposes, has been proposed, argues, another theory, some "
-    "scholars, posits, speculates, derived by others from — the last found on "
-    "`*māros`, whose «Derived by others from *moh₁-ro-s» the walk carried "
-    "along as though the entry had asserted it.\n\n"
-    "Two traps, both from real entries. **Scope**: `frasca` mixes «A "
-    "pre-Roman origin has been proposed» with firmly stated claims in one "
-    "section, so the qualification must end at the full stop or it demotes "
-    "everything after it. **Object**: `bravo` says «George Nicholson argues "
-    "the opposite» — the verb qualifies, but what follows is a *contrary* "
-    "thesis, so demoting what comes after would hit the wrong claim. The "
-    "class this would genuinely add is ten to fifteen entries; on most of the "
-    "rest an explicit {{unk}} already wins.",
-)
 def test_a_theory_attributed_to_a_scholar_is_not_a_step():
     analysis = parse(
         "From {{inh|la|itc-pro|*didō}}. Another theory, advanced by the "
@@ -937,6 +935,65 @@ def test_a_theory_attributed_to_a_scholar_is_not_a_step():
     )
     assert [f.lemma for step in analysis.steps for f in step.forms] == ["*didō"]
     assert [h.form.lemma for h in analysis.hypotheses] == ["*dowjō"]
+
+
+@pytest.mark.parametrize(
+    "proposal",
+    [
+        "Jasanoff suggests that",
+        "Jasanoff proposes that",
+        "It has been proposed that",
+        "A scholar argues that",
+        "Some scholars",
+        "A scholar posits that",
+        "A scholar speculates that",
+        "Derived by others from",
+    ],
+)
+def test_explicit_proposal_wording_is_not_asserted(proposal):
+    analysis = parse(
+        f"{proposal} {{{{inh|it|la|cavolo}}}}.",
+        "it",
+    )
+    assert analysis.steps == []
+    assert [h.form.lemma for h in analysis.hypotheses] == ["cavolo"]
+
+
+def test_according_to_is_not_a_proposal_marker():
+    analysis = parse("According to Ernout-Meillet, from {{inh|it|la|cavolo}}.", "it")
+    assert [s.forms[0].lemma for s in analysis.steps] == ["cavolo"]
+    assert analysis.hypotheses == []
+
+
+def test_frascas_proposal_stops_at_the_sentence_boundary():
+    analysis = parse(
+        "A pre-Roman origin has been proposed from {{inh|it|la|praeromanum}}. "
+        "From {{inh|it|la|frāsca}}, from {{der|it|la|frāsca2}}.",
+        "it",
+    )
+    assert [s.forms[0].lemma for s in analysis.steps] == ["frāsca", "frāsca2"]
+    assert [h.form.lemma for h in analysis.hypotheses] == ["praeromanum"]
+
+
+def test_bravos_contrary_argument_does_not_qualify_its_thesis():
+    analysis = parse(
+        "George Nicholson argues the opposite, from "
+        "{{inh|it|la|barbarus}}.",
+        "it",
+    )
+    assert [s.forms[0].lemma for s in analysis.steps] == ["barbarus"]
+    assert analysis.hypotheses == []
+
+
+def test_menzogna_comma_or_keeps_both_competing_etymons_uncertain():
+    analysis = parse(
+        "From a {{inh|it|la-vul|*mentionia}}, probably from a crossing of "
+        "{{inh|it|la|mentio}} with {{m|la|mentīri}}, or derived from a "
+        "{{inh|it|la-lat|mentiō}}.",
+        "it",
+    )
+    assert [s.forms[0].lemma for s in analysis.steps] == ["*mentionia"]
+    assert [h.form.lemma for h in analysis.hypotheses] == ["mentio", "mentiō"]
 
 
 class TestTheTemplateNamesTheLanguage:
