@@ -22,6 +22,9 @@ from tools.survey_corpus import (  # noqa: E402
     _summarise,
     _survey_one,
 )
+from tools.survey_corpus import (  # noqa: E402
+    main as survey_main,
+)
 
 
 def entry(language: str, etymology: str) -> str:
@@ -31,7 +34,7 @@ def entry(language: str, etymology: str) -> str:
 
 
 class TestOutcomes:
-    """Four outcomes, and the line between them is the project's own.
+    """Whole-entry outcomes keep their historical meaning.
 
     A branch that ends because the language has nothing more to give is a
     finding; one that ends because the source or the program could not go on is
@@ -63,8 +66,86 @@ class TestOutcomes:
     def test_an_entry_going_nowhere_has_no_chain(self):
         source = DictSource({"x": "==Italian==\n\n===Noun===\n{{head}}\n\n# a word\n"})
         row = _survey_one("x", source)
-        assert row["outcome"] == "no chain"
+        assert row["outcome"] == "source silent"
+        assert row["legacy_outcome"] == "no chain"
+        assert row["terminal_classes"] == ["source silent"]
         assert row["steps"] == 0
+
+    def test_a_language_without_a_form_is_not_silence(self):
+        source = DictSource({"x": entry("Italian", "From {{inh|it|la}}.")})
+        row = _survey_one("x", source)
+        assert row["outcome"] == "no form given"
+        assert row["terminal_classes"] == ["no form given"]
+
+    def test_origin_without_an_etymon_is_not_unread(self):
+        source = DictSource({
+            "ahi": entry("Italian", "Of onomatopoeic origin."),
+            "alcol-deidrogenasi": entry("Italian", "{{internationalism|it}}."),
+        })
+        for word in ("ahi", "alcol-deidrogenasi"):
+            row = _survey_one(word, source)
+            assert row["outcome"] == "origin without etymon"
+            assert row["terminal_classes"] == ["origin without etymon"]
+
+    def test_glosses_and_comparisons_are_not_etymologies(self):
+        source = DictSource({
+            "toccare il fondo": entry(
+                "Italian",
+                "{{lit|to touch the bottom}}. Compare {{cog|fr|toucher le fond}}.",
+            ),
+            "alluccare": entry("Italian", "Compare {{cog|nap|alloccare}}."),
+            "accostare": entry(
+                "Italian",
+                "Either: Cognate with {{cog|fr|accoster}} and "
+                "{{cog|es|acostar}}.",
+            ),
+        })
+        for word in ("toccare il fondo", "alluccare", "accostare"):
+            row = _survey_one(word, source)
+            assert row["outcome"] == "not an etymology"
+            assert row["terminal_classes"] == ["not an etymology"]
+
+    def test_an_explicit_descent_missed_by_the_parser_is_unread(self):
+        source = DictSource({"absidiola": entry("Italian", "From {{m|it|abside}}.")})
+        row = _survey_one("absidiola", source)
+        assert row["outcome"] == "unread"
+        assert row["terminal_classes"] == ["unread"]
+
+    def test_unrecognised_prose_is_not_assumed_to_be_a_descent(self):
+        source = DictSource({
+            "x": entry("Italian", "The phrase is mainly used in formal writing.")
+        })
+        row = _survey_one("x", source)
+        assert row["outcome"] == "unclassified"
+        assert row["terminal_classes"] == ["unclassified"]
+
+    def test_a_parsed_borrowing_is_not_reported_as_a_parser_gap(self):
+        # Although the entry also names an eponymous origin, the bor template
+        # is understood and followed. Its absent donor page is a source limit.
+        source = DictSource({
+            "ambaradam": entry(
+                "Italian",
+                "Named after the Battle of Amba Aradam; from "
+                "{{bor|it|am|አምባ አረደም}}.",
+            )
+        })
+        row = _survey_one("ambaradam", source)
+        assert row["outcome"] == "limited"
+        assert row["terminal_classes"] == ["entry missing"]
+        assert row["outcome"] != "unread"
+
+    def test_comparison_terminal_inside_a_chain_is_not_an_unread_gap(self):
+        source = DictSource({
+            "x": entry("Italian", "{{deverbal|it|accostare}}."),
+            "accostare": entry(
+                "Italian",
+                "Either: Cognate with {{cog|fr|accoster}} and "
+                "{{cog|es|acostar}}.",
+            ),
+        })
+        row = _survey_one("x", source)
+        assert row["outcome"] == "limited"
+        assert row["terminal_classes"] == ["not an etymology"]
 
     def test_an_unreadable_entry_does_not_stop_the_survey(self):
         # One bad entry in 127101 must not end a run that has taken days.
@@ -122,8 +203,74 @@ class TestSummary:
         summary = _summarise(log)
         assert summary["surveyed"] == 3
         assert summary["outcomes"]["complete"] == 2
+        assert summary["legacy_outcomes"]["complete"] == 2
         assert summary["terminals"]["uncertain_origin"] == 2
         assert summary["mean_steps"] == 2.0
+
+    def test_new_outcomes_preserve_legacy_aggregate_counts(self, tmp_path):
+        log = tmp_path / "survey.jsonl"
+        log.write_text(
+            "\n".join(
+                json.dumps(row)
+                for row in (
+                    {"word": "old-silent", "outcome": "no chain", "steps": 0,
+                     "terminals": ["etymology_missing"]},
+                    {"word": "old-unread", "outcome": "no chain", "steps": 0,
+                     "terminals": ["not_interpreted"]},
+                    {"word": "new-unread", "outcome": "unread",
+                     "legacy_outcome": "no chain", "steps": 0,
+                     "terminals": ["not_interpreted"],
+                     "terminal_classes": ["unread"]},
+                )
+            ) + "\n",
+            encoding="utf-8",
+        )
+        summary = _summarise(log)
+        assert summary["legacy_outcomes"] == {"no chain": 3}
+        assert summary["outcomes"] == {
+            "source silent": 1,
+            "unclassified legacy": 1,
+            "unread": 1,
+        }
+        assert summary["legacy_outcomes_for_lemmas"] == {"no chain": 3}
+        assert summary["terminal_classes"] == {
+            "source silent": 1,
+            "unclassified legacy": 1,
+            "unread": 1,
+        }
+
+    def test_step_summary_shows_refined_and_legacy_outcomes(
+        self, tmp_path, monkeypatch
+    ):
+        corpus = tmp_path / "corpus.json"
+        corpus.write_text('{"items": [{"word": "absidiola"}]}', encoding="utf-8")
+        fixtures = tmp_path / "fixtures.json"
+        fixtures.write_text(
+            json.dumps({
+                "absidiola": entry("Italian", "From {{m|it|abside}}.")
+            }),
+            encoding="utf-8",
+        )
+        output = tmp_path / "survey.jsonl"
+        summary = tmp_path / "summary.md"
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "survey_corpus.py",
+                "--corpus", str(corpus),
+                "--output", str(output),
+                "--offline-fixtures", str(fixtures),
+                "--delay", "0",
+                "--summary-md", str(summary),
+            ],
+        )
+
+        assert survey_main() == 0
+        report = summary.read_text(encoding="utf-8")
+        assert "| `unread` | 1 |" in report
+        assert "Legacy aggregate outcomes" in report
+        assert "| `no chain` | 1 |" in report
 
 
 class TestAnchoring:
