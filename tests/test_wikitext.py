@@ -636,6 +636,11 @@ class TestLemmaIsNeverCorrupted:
         form = analysis.steps[0].forms[0]
         assert (form.lemma, form.language) == ("*keh₂ulis", "ine-pro")
 
+    def test_a_multi_subtag_language_code_is_split_off(self):
+        analysis = parse("{{etymon|it|:der|tup-gua-pro:*nanã}}", "it")
+        form = analysis.steps[0].forms[0]
+        assert (form.lemma, form.language) == ("*nanã", "tup-gua-pro")
+
 
 class TestSeveralSpellingsInOneParameter:
     """One parameter can hold several spellings of the same form.

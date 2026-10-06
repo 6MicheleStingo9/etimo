@@ -497,7 +497,7 @@ _DEFINITION_WORDINGS: dict[str, str] = {
 
 # What a Wiktionary language code looks like: `la`, `grc`, `ine-pro`, `la-vul`.
 # Used to tell a code prefix from a colon that belongs to the word itself.
-_LANGUAGE_CODE = re.compile(r"[a-z]{2,3}(?:-[a-z]{2,4})?")
+_LANGUAGE_CODE = re.compile(r"[a-z]{2,3}(?:-[a-z]{2,4})*")
 
 _STRAY_BRACKETS = re.compile(r"\[\[|\]\]")
 _SECTION_ANCHOR = re.compile(r"#.*$")
