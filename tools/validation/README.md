@@ -85,18 +85,39 @@ the point.
 Sharing one job would have starved the survey: work with an end always loses
 to work without one when the two compete for a quota.
 
-Each entry is recorded as one of four outcomes:
+Whole-entry outcomes still use `complete`, `partial`, and `limited` for walks
+that produced a chain. Where the old survey said `no chain`, the new `outcome`
+names the reason rather than treating every stop as the same result:
 
-| | |
+| outcome | meaning |
 | --- | --- |
-| `complete` | every branch ended on a fact about the language |
-| `partial` | some branches on a fact, others on a limit |
-| `limited` | every branch stopped at a limit of the source or the program |
-| `no chain` | no ancestor could be read at all |
+| `source silent` | the entry records no etymology |
+| `no form given` | the source names a language or origin but gives no form |
+| `origin without etymon` | an origin is stated (for example, onomatopoeic or eponymous), without a lexical ancestor |
+| `not an etymology` | the section gives only a literal gloss or a comparison |
+| `unread` | the entry explicitly states a descent the parser did not read |
+| `unclassified` | the prose does not establish which of those classes applies |
+
+An unavailable page or language remains `limited`; `unread` is reserved for
+positive evidence of a descent. An unrecognised sentence, by itself, is not
+enough to call the parser wrong. Branch-level `terminal_classes` carry this
+distinction even inside a chain whose whole-entry outcome remains `partial` or
+`limited`.
 
 `partial` is not a rounding of the other two. A compound whose halves fare
 differently is the ordinary case, and collapsing it would hide exactly the
 distinction this project exists to keep.
+
+The append-only log retains each row's former broad value as
+`legacy_outcome`, and `--summary` reports those aggregate counts separately as
+`legacy_outcomes`. Existing rows are never rewritten: when an old
+`not_interpreted` branch has no stored source text, its terminal class—and,
+when its former outcome was `no chain`, its refined outcome—is classified as
+`unclassified legacy`, not an assumed parser gap. Original `terminals` are also
+kept; the new `terminal_classes` are a separate, survey-side interpretation.
+Thus historical totals remain comparable while newly surveyed entries use the
+split. The same compatibility count is reported for lemmas as
+`legacy_outcomes_for_lemmas`, alongside the refined `outcomes_for_lemmas`.
 
 ### Anchoring: the one check that does not use the parser's tables
 

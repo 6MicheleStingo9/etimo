@@ -34,6 +34,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 import time
 import unicodedata
@@ -42,6 +43,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import mwparserfromhell
+
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
@@ -49,8 +52,10 @@ if str(SRC) not in sys.path:
 
 from etimo.cache import DiskCache  # noqa: E402
 from etimo.cache import default_path as default_cache_path  # noqa: E402
-from etimo.models import Node  # noqa: E402
+from etimo.languages import page_title  # noqa: E402
+from etimo.models import Node, Terminal  # noqa: E402
 from etimo.walker import Reconstructor  # noqa: E402
+from etimo.wikitext import etymology_sections, language_section  # noqa: E402
 from etimo.wiktionary import (  # noqa: E402
     DictSource,
     SourceError,
@@ -229,6 +234,135 @@ def _terminals(node: Node) -> list[Node]:
     return found
 
 
+_NO_CHAIN_OUTCOMES = frozenset(
+    {
+        "source silent",
+        "no form given",
+        "origin without etymon",
+        "not an etymology",
+        "unread",
+        "unclassified",
+        "unclassified legacy",
+    }
+)
+_ASSERTED_DESCENT = re.compile(
+    r"^\s*(?:(?:either|alternatively)\s*:\s*)?"
+    r"(?:from|derived from|borrowed from|inherited from|"
+    r"descended from|formed from|a borrowing of|a calque of)\b",
+    re.IGNORECASE,
+)
+_ORIGIN_WITHOUT_ETYMON = re.compile(
+    r"\b(?:onomatopoeic|onomatop(?:oeia|oetic)|imitative|"
+    r"internationalism|named after|named for|eponym(?:ous)?)\b",
+    re.IGNORECASE,
+)
+_NON_ETYMOLOGY = re.compile(
+    r"\b(?:compare|cognate with|cognate to|literally|literal gloss)\b",
+    re.IGNORECASE,
+)
+
+
+def _source_material(node: Node, recorder: _Recording) -> tuple[str, set[str]]:
+    """Raw etymology text and template names behind a terminal."""
+    if not node.form.lemma:
+        return "", set()
+    page = recorder.pages.get(page_title(node.form.lemma, node.form.language))
+    if not page:
+        return "", set()
+    section = language_section(page, node.form.language)
+    if section is None:
+        return "", set()
+    names: set[str] = set()
+    bodies: list[str] = []
+    for _, body in etymology_sections(section)[:1]:
+        bodies.append(body)
+        for template in mwparserfromhell.parse(body).filter_templates(
+            recursive=True
+        ):
+            names.add(str(template.name).strip().casefold().replace("_", " "))
+    return "\n".join(bodies), names
+
+
+def _terminal_class(node: Node, recorder: _Recording) -> str:
+    """Classify why a branch stopped without accusing ignored source material.
+
+    `not_interpreted` is only called `unread` when the entry positively states
+    descent. An origin without a lexical ancestor, a comparison, or an
+    unrecognised sentence is not evidence of a parser gap.
+    """
+    terminal = node.terminal
+    if terminal is Terminal.ETYMOLOGY_MISSING:
+        return "source silent"
+    if terminal is Terminal.FORM_NOT_GIVEN:
+        return "no form given"
+    if terminal in {Terminal.EPONYM, Terminal.IMITATIVE}:
+        return "origin without etymon"
+    if terminal is not Terminal.NOT_INTERPRETED:
+        return terminal.name.lower().replace("_", " ")
+
+    raw_text, templates = _source_material(node, recorder)
+    text = f"{node.source_text or ''}\n{raw_text}"
+    folded_templates = {name.replace(" ", "") for name in templates}
+    if (
+        _ORIGIN_WITHOUT_ETYMON.search(text)
+        or folded_templates.intersection(
+            {"internationalism", "onomatopoeia", "onomatopoeic", "eponym"}
+        )
+    ):
+        return "origin without etymon"
+    if _ASSERTED_DESCENT.search(text):
+        return "unread"
+    if (
+        _NON_ETYMOLOGY.search(text)
+        or folded_templates.intersection({"lit", "cog", "cognate"})
+    ):
+        return "not an etymology"
+    return "unclassified"
+
+
+def _legacy_outcome(row: dict[str, Any]) -> str:
+    """Read the pre-split outcome for comparison with the append-only survey."""
+    old = row.get("legacy_outcome")
+    if old:
+        return old
+    if row.get("outcome") in _NO_CHAIN_OUTCOMES:
+        return "no chain"
+    return row.get("outcome", "?")
+
+
+def _legacy_terminal_classes(row: dict[str, Any]) -> list[str]:
+    """Safely classify what old rows recorded, without guessing at prose."""
+    result: list[str] = []
+    for name in row.get("terminals", []):
+        if name == "etymology_missing":
+            result.append("source silent")
+        elif name == "form_not_given":
+            result.append("no form given")
+        elif name in {"eponym", "imitative"}:
+            result.append("origin without etymon")
+        elif name == "not_interpreted":
+            result.append("unclassified legacy")
+        else:
+            result.append(name.replace("_", " "))
+    return result
+
+
+def _classified_outcome(row: dict[str, Any]) -> str:
+    """Return the refined outcome, leaving unclassifiable old prose explicit."""
+    if row.get("legacy_outcome") is not None:
+        return row.get("outcome", "?")
+    outcome = row.get("outcome", "?")
+    if outcome != "no chain":
+        return outcome
+    classes = _legacy_terminal_classes(row)
+    if len(classes) == 1:
+        only = classes[0]
+        if only in _NO_CHAIN_OUTCOMES:
+            return only
+        return "limited"
+    return "unclassified legacy"
+
+
 def _survey_one(word: str, source: WikitextSource) -> dict[str, Any]:
     """Where the walk got to for one lemma, and at whose limit it stopped."""
     started = time.perf_counter()
@@ -254,22 +388,43 @@ def _survey_one(word: str, source: WikitextSource) -> dict[str, Any]:
     # distinction is what the whole project turns on, so it is recorded per
     # branch and not collapsed into one verdict.
     if result.steps == 0 and not linguistic:
-        outcome = "no chain"
+        legacy_outcome = "no chain"
     elif linguistic and len(linguistic) == len(terminals):
-        outcome = "complete"
+        legacy_outcome = "complete"
     elif linguistic:
-        outcome = "partial"
+        legacy_outcome = "partial"
     else:
-        outcome = "limited"
+        legacy_outcome = "limited"
+
+    terminal_classes = sorted(
+        {
+            _terminal_class(leaf, recorder)
+            for leaf in leaves
+            if leaf.terminal is not None
+        }
+    )
+    outcome = legacy_outcome
+    if legacy_outcome == "no chain":
+        if len(terminal_classes) == 1:
+            classification = terminal_classes[0]
+            outcome = (
+                classification
+                if classification in _NO_CHAIN_OUTCOMES
+                else "limited"
+            )
+        else:
+            outcome = "unclassified"
 
     anchoring = _anchoring(result.start, recorder.seen())
 
     return {
         "word": word,
         "outcome": outcome,
+        "legacy_outcome": legacy_outcome,
         "anchored": anchoring["forms_unanchored"] == 0,
         "steps": result.steps,
         "terminals": sorted({t.name.lower() for t in terminals}),
+        "terminal_classes": terminal_classes,
         **anchoring,
         "linguistic_terminals": len(linguistic),
         "total_terminals": len(terminals),
@@ -282,7 +437,9 @@ def _survey_one(word: str, source: WikitextSource) -> dict[str, Any]:
 
 def _summarise(path: Path) -> dict[str, Any]:
     outcomes: Counter[str] = Counter()
+    legacy_outcomes: Counter[str] = Counter()
     terminals: Counter[str] = Counter()
+    terminal_classes: Counter[str] = Counter()
     steps_total = 0
     counted = 0
     anchored = 0
@@ -292,19 +449,30 @@ def _summarise(path: Path) -> dict[str, Any]:
     by_shape: dict[str, Counter[str]] = {
         name: Counter() for name in ("lemma", "multiword", "proper", "affix")
     }
+    legacy_by_shape: dict[str, Counter[str]] = {
+        name: Counter() for name in ("lemma", "multiword", "proper", "affix")
+    }
     with path.open(encoding="utf-8") as handle:
         for line in handle:
             try:
                 row = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            outcomes[row.get("outcome", "?")] += 1
+            outcomes[_classified_outcome(row)] += 1
+            legacy_outcomes[_legacy_outcome(row)] += 1
             counted += 1
             steps_total += int(row.get("steps") or 0)
             for name in row.get("terminals", []):
                 terminals[name] += 1
+            for name in row.get("terminal_classes") or _legacy_terminal_classes(row):
+                terminal_classes[name] += 1
             shapes[_shape(row.get("word", ""))] += 1
-            by_shape[_shape(row.get("word", ""))][row.get("outcome", "?")] += 1
+            by_shape[_shape(row.get("word", ""))][
+                _classified_outcome(row)
+            ] += 1
+            legacy_by_shape[_shape(row.get("word", ""))][
+                _legacy_outcome(row)
+            ] += 1
             if row.get("forms_drawn"):
                 with_forms += 1
                 if row.get("anchored"):
@@ -316,7 +484,9 @@ def _summarise(path: Path) -> dict[str, Any]:
     return {
         "surveyed": counted,
         "outcomes": dict(outcomes.most_common()),
+        "legacy_outcomes": dict(legacy_outcomes.most_common()),
         "terminals": dict(terminals.most_common()),
+        "terminal_classes": dict(terminal_classes.most_common()),
         "mean_steps": round(steps_total / counted, 2) if counted else 0.0,
         # Of the entries that drew anything at all, how many drew only forms
         # the source had actually written. This is the reliability figure: not
@@ -332,6 +502,9 @@ def _summarise(path: Path) -> dict[str, Any]:
         # part of the population the audit was scoped to.
         "composition": dict(shapes.most_common()),
         "outcomes_for_lemmas": dict(by_shape["lemma"].most_common()),
+        "legacy_outcomes_for_lemmas": dict(
+            legacy_by_shape["lemma"].most_common()
+        ),
     }
 
 
@@ -456,7 +629,16 @@ def main() -> int:
                 for name, count in summary["outcomes_for_lemmas"].items()
             ),
             "",
-            "### Outcomes across everything surveyed",
+            "Legacy lemma totals retain the former buckets for comparison:",
+            "",
+            "| outcome | count |",
+            "|---|---:|",
+            *(
+                f"| `{name}` | {count} |"
+                for name, count in summary["legacy_outcomes_for_lemmas"].items()
+            ),
+            "",
+            "### Refined outcomes across everything surveyed",
             "",
             "| outcome | count | meaning |",
             "|---|---:|---|",
@@ -465,12 +647,45 @@ def main() -> int:
             "complete": "every branch ended on a fact about the language",
             "partial": "some branches ended on a fact, others on a limit",
             "limited": "every branch stopped at a limit of source or program",
-            "no chain": "no ancestor could be read at all",
+            "source silent": "the entry records no etymology",
+            "no form given": "a language or origin is named without an etymon",
+            "origin without etymon": "an origin is stated, but no lexical ancestor",
+            "not an etymology": "the section contains only a gloss or comparison",
+            "unread": "the entry explicitly states a descent the parser did not read",
+            "unclassified": "the prose does not establish which class applies",
+            "unclassified legacy": "old row has no source text to classify safely",
             "unreachable": "the source could not be reached",
             "exception": "the walk raised an unexpected error",
         }
         for name, count in summary["outcomes"].items():
             lines.append(f"| `{name}` | {count} | {meaning.get(name, '')} |")
+        lines += [
+            "",
+            "### Legacy aggregate outcomes",
+            "",
+            "These preserve the original buckets so counts from existing survey "
+            "rows remain comparable. Old `not_interpreted` rows have no stored "
+            "source text and are not retroactively called `unread`.",
+            "",
+            "| outcome | count |",
+            "|---|---:|",
+            *(
+                f"| `{name}` | {count} |"
+                for name, count in summary["legacy_outcomes"].items()
+            ),
+            "",
+            "### Terminal classes",
+            "",
+            "Branch terminals are classified separately from whole-entry "
+            "outcomes, including terminals inside otherwise readable chains.",
+            "",
+            "| terminal class | count |",
+            "|---|---:|",
+            *(
+                f"| `{name}` | {count} |"
+                for name, count in summary["terminal_classes"].items()
+            ),
+        ]
         if summary["unanchored_examples"]:
             lines += [
                 "",
