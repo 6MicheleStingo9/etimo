@@ -83,13 +83,11 @@ which cut a slit in that constraint rather than removing it. Whether
 «modify the `.md` files directly» reaches as far as commit and push is his to
 say, and only his.
 
-**Until he says otherwise: the linguist writes the file and names it; the
-developer session commits it.** That is one extra line in a message and no
-risk, and it is the correct outcome even if the wider reading turns out to be
-right — a peer cannot widen a permission the user granted in a precise form.
-Had this session simply asserted the wider reading, it would have moved
-Michele's boundary on his behalf, which is a worse failure than a redundant
-round trip.
+**The latest explicit authorization governs.** Michele has since authorized
+the developer session to manage the repository end to end, including issues,
+pull requests, reviews, merges and follow-up work. That authorization
+supersedes the older merge and hand-off restrictions above; do not stop for
+approval that he has already delegated.
 
 **How an issue gets executed, from September 2026.** Read the repository
 first — the open issues and their comments say what is live and what class it
@@ -121,10 +119,38 @@ written to repair it. Twenty corrections have been made to the measuring
 instruments here and eighteen accused something that was working. None has
 ever excused a defect.
 
-**Michele merges.** The two of us open issues, write pull requests and review
-them; the merge button is his, on every pull request, without exception —
-stated 6 September, after a session tried to merge its own. A pull request is a
-proposal, and it stays open until he takes it.
+## Written trace of repository work
+
+Every repository-management action must leave a clear written explanation for
+Michele, not just a changed state. He uses issues and pull requests to follow
+the work and understand why it happened; treat the written record as part of
+the deliverable.
+
+- **Opening an issue:** state the observed problem, evidence or measurement,
+  impact, proposed next step and any uncertainty. Do not file an inference as
+  an observed fact.
+- **Updating or closing an issue:** comment with what was checked, what changed,
+  the relevant PR/commit/run, and why the issue is resolved, superseded or
+  intentionally left open. If only part is done, say what remains.
+- **Opening a pull request:** explain the behavior before and after, the
+  implementation approach, scope and non-goals, local and remote validation,
+  and what the checks do not establish. Link the issue and say whether it is
+  being closed or kept open.
+- **Merging:** leave or preserve a PR record that explains why the change is
+  ready, what CI showed, and the merge result. Then verify the remote state;
+  when useful, run the relevant post-merge workflow and record its result on
+  the issue or PR.
+- **Committing:** use a message that explains the change and its purpose, not
+  merely its file or implementation detail. Include the repository's required
+  co-author trailer.
+- **Other consequential actions** — such as rebases, branch deletion, releases,
+  or workflow dispatches — need a concise issue/PR comment or equivalent
+  written record explaining the action and outcome.
+
+Keep the explanation accessible: lead with the reason and result, distinguish
+measured evidence from assumptions, link related work, and identify remaining
+work. A terse automated state change without this context is not a complete
+handoff.
 
 **One exception, and it is not negotiable:** the two workflows commit the ledger
 and the survey log to this branch every night, directly. That is why branch
