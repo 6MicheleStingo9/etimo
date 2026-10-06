@@ -157,6 +157,31 @@ _WORD_FORMATION_RELATIONS: dict[str, Relation] = {
     "alternative form of": Relation.VARIANT,
 }
 
+# A small set of explicit prose governors can license a following same-language
+# mention as an etymon. Inflection and spelling pointers are deliberately absent
+# because they name another form of the same lexeme.
+_PROSE_RELATIONS: tuple[tuple[re.Pattern[str], Relation], ...] = (
+    (re.compile(r"\bfrom\s+(?:(?:a|an|the)\s+)?$", re.I), Relation.DERIVED),
+    (
+        re.compile(r"\bderived\s+from\s+(?:(?:a|an|the)\s+)?$", re.I),
+        Relation.DERIVED,
+    ),
+    (
+        re.compile(r"\breformed\s+from\s+(?:(?:a|an|the)\s+)?$", re.I),
+        Relation.DERIVED,
+    ),
+    (re.compile(r"\bdeverbal\s+of\s+(?:(?:a|an|the)\s+)?$", re.I), Relation.DEVERBAL),
+    (
+        re.compile(r"\bdiminutive\s+of\s+(?:(?:a|an|the)\s+)?$", re.I),
+        Relation.DIMINUTIVE,
+    ),
+    (
+        re.compile(r"\baugmentative\s+of\s+(?:(?:a|an|the)\s+)?$", re.I),
+        Relation.AUGMENTATIVE,
+    ),
+    (re.compile(r"\bclipping\s+of\s+(?:(?:a|an|the)\s+)?$", re.I), Relation.CLIPPING),
+)
+
 # --- Templates declaring an unknown or doubtful origin --------------------
 _UNCERTAINTY = {"unk", "unknown", "unc", "uncertain", "unknown origin"}
 
@@ -892,6 +917,27 @@ def _form_from_relation(tpl: Template) -> Form | None:
     )
 
 
+def _form_from_mention(tpl: Template) -> Form | None:
+    """Extract a form from a neutral mention when prose explicitly licenses it."""
+    language = _param(tpl, "1")
+    lemma = _param(tpl, "2")
+    if not language or not lemma or lemma == "-":
+        return None
+    return Form(
+        lemma=lemma,
+        language=language,
+        gloss=_first_available(tpl, "t", "gloss", "4") or None,
+    )
+
+
+def _prose_relation(lead_in: str) -> Relation | None:
+    """Return the explicit prose relation immediately governing a mention."""
+    for pattern, relation in _PROSE_RELATIONS:
+        if pattern.search(lead_in):
+            return relation
+    return None
+
+
 # Language-specific templates carry no language parameter — `{{it-deverbal|x}}`,
 # not `{{it-deverbal|it|x}}` — so their components start one position earlier.
 _NO_LANGUAGE_PARAMETER = {
@@ -1365,6 +1411,72 @@ def _parse_body(body: str, entry_language: str) -> Analysis:
                     Step(relation=_WORD_FORMATION_RELATIONS[name], forms=forms),
                     connective,
                 )
+
+        elif name in _PROMOTABLE_MENTION:
+            form = _form_from_mention(tpl)
+            relation = _prose_relation(lead_in)
+            composed = False
+            later_conditioned_relation = False
+            for later_lead_in, later_template in sequence[position + 1:]:
+                if _SENTENCE_END.search(later_lead_in):
+                    break
+                later_name = _normalize_name(later_template.name)
+                if (
+                    later_name in _LINEAR_RELATIONS
+                    or later_name in _WORD_FORMATION_RELATIONS
+                ) and _CONDITIONING.search(_plain_text(later_lead_in)):
+                    later_conditioned_relation = True
+                    break
+            if (
+                form
+                and position > 0
+                and _normalize_name(sequence[position - 1][1].name)
+                in _PROMOTABLE_MENTION
+                and not _SENTENCE_END.search(lead_in)
+            ):
+                previous_lead_in, previous_template = sequence[position - 1]
+                previous_relation = _prose_relation(previous_lead_in)
+                previous_form = _form_from_mention(previous_template)
+                if (
+                    previous_relation
+                    and previous_form
+                    and previous_form.language == form.language == entry_language
+                ):
+                    if _COMPOSITION.search(lead_in):
+                        relation = previous_relation
+                        composed = True
+                    elif _ALTERNATION.search(readable_conditioning_clause):
+                        relation = previous_relation
+
+            if (
+                form
+                and relation
+                and form.language == entry_language
+                and not later_conditioned_relation
+            ):
+                if conditioned:
+                    analysis.hypotheses.append(
+                        Hypothesis(
+                            form=form,
+                            attribution=_qualifying_phrase(readable_lead_in),
+                        )
+                    )
+                elif (
+                    composed
+                    and analysis.steps
+                    and analysis.steps[-1].forms
+                    and analysis.steps[-1].forms[0].language == form.language
+                ):
+                    previous_step = analysis.steps[-1]
+                    previous_step.forms.append(form)
+                    if relation is Relation.DERIVED:
+                        previous_step.relation = Relation.COMPOUND
+                else:
+                    _place_step(
+                        analysis,
+                        Step(relation=relation, forms=[form]),
+                        connective,
+                    )
 
         elif name == "root":
             # The ultimate root is categorisation data, not a link: treating it

@@ -189,6 +189,18 @@ class TestNoInventedFacts:
         assert result.start.source_text == "From loglio."
         assert "From loglio." in tree(result, PLAIN)
 
+    def test_a_governed_mention_becomes_a_link_instead_of_a_contradictory_note(self):
+        pages = {
+            "absidiola": entry("Italian", "From {{m|it|abside}}."),
+            "abside": "==Italian==\n\n===Noun===\n{{it-noun|f}}\n",
+        }
+        result = walk(pages, "absidiola")
+        assert [
+            (child.form.lemma, child.relation) for child in result.start.children
+        ] == [("abside", Relation.DERIVED)]
+        assert result.start.source_text is None
+        assert "etymology not interpreted" not in tree(result, PLAIN)
+
 
 class TestDescendantsAreNotAncestors:
     def test_the_body_stops_at_the_first_subheading(self):

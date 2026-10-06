@@ -69,6 +69,24 @@ alternatives, so the marker still covers both («probably from A, or from B»).
 The converse trap: in «Probably from A. Compare B», the marker never reaches B
 at all, because B is a comparison and was never a candidate ancestor.
 
+### A mention needs a governing phrase
+
+`{{m}}` names a form; by itself it makes no claim about the form's relation to
+the entry. When an explicit same-language phrase immediately governs it —
+«From», «Derived from», «Reformed from», or «Deverbal of» — the mention can
+supply the form for that stated relation. For example, «From `{{m|it|abside}}`»
+licenses a derivation, while «Compare `{{m|it|ino}}`» and «See
+`{{m|it|abbigliare}}`» do not.
+
+The phrase must also name a different lexeme. «Feminine of», «Plural of»,
+«Past participle of» and spelling-variant phrases describe another form of the
+same lexeme, not an ancestor. They must not become links merely because they
+precede a mention. A qualifier such as «Probably» still governs the relation:
+«Probably derived from `{{m|it|cagione}}`» is a hypothesis, not an asserted
+link. When a plus sign joins governed mentions («From
+`{{m|it|acqua}}` + `{{m|it|ragia}}`»), both forms are components of the same
+compound.
+
 ### The shared component of competing analyses is not in competition
 
 ```
