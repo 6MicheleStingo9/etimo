@@ -51,6 +51,16 @@ is the defect, not the reading.
 
 ## 1. The relation is in the prose and the form is in a `{{m}}` — 52 entries
 
+**Status:** the parser now reads an explicit same-language governor before a
+mention, while leaving comparisons, spelling pointers and inflection phrases
+out of the chain. A live recheck covered the ten examples listed below:
+nine now produce a chain and `accagionare` remains a hypothesis because its
+entry says *probably*. The additional controls `amarena`, `alunna` and
+`accosto` (sense 2) respectively produce a chain, remain unlinked as an
+inflection, and retain their existing deverbal link. The committed issue and
+this document preserve only ten of the claimed 52 names, so the original
+52-entry total and phrase frequencies could not be independently reproduced.
+
 ```
 absidiola      From {{m|it|abside}}.
 affondatoio    From {{m|it|affondare}}.
@@ -64,11 +74,12 @@ acquisire      Reformed from {{m|it|acquisito}}; cf. {{m|it|acquistare}}.
 accapigliarsi  From {{m|it|capegli}}, older form of {{m|it|capelli}}.
 ```
 
-The prose carries the relation; the `{{m}}` carries the form. These are
-unambiguous Italian derivations, and the link is never drawn.
+The prose carries the relation; the `{{m}}` carries the form. In the initial
+measurement, these were judged to be Italian derivations that the then-current
+tool did not draw.
 
-**The text does reach the user**, though — an earlier draft of this document
-said it did not, and that was overstated:
+**The text did reach the user before this gap was fixed — an earlier draft of
+this document said it did not, and that was overstated:**
 
 ```
 $ etimo absidiola

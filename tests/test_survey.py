@@ -105,11 +105,12 @@ class TestOutcomes:
             assert row["outcome"] == "not an etymology"
             assert row["terminal_classes"] == ["not an etymology"]
 
-    def test_an_explicit_descent_missed_by_the_parser_is_unread(self):
+    def test_an_explicit_prose_descent_is_not_reported_as_unread(self):
         source = DictSource({"absidiola": entry("Italian", "From {{m|it|abside}}.")})
         row = _survey_one("absidiola", source)
-        assert row["outcome"] == "unread"
-        assert row["terminal_classes"] == ["unread"]
+        assert row["outcome"] == "limited"
+        assert row["steps"] == 1
+        assert row["terminal_classes"] == ["entry missing"]
 
     def test_unrecognised_prose_is_not_assumed_to_be_a_descent(self):
         source = DictSource({
@@ -268,9 +269,11 @@ class TestSummary:
 
         assert survey_main() == 0
         report = summary.read_text(encoding="utf-8")
-        assert "| `unread` | 1 |" in report
+        assert "| `limited` | 1 |" in report
+        assert "| `entry missing` | 1 |" in report
         assert "Legacy aggregate outcomes" in report
-        assert "| `no chain` | 1 |" in report
+        legacy = report.split("### Legacy aggregate outcomes", 1)[1].split("###", 1)[0]
+        assert "| `limited` | 1 |" in legacy
 
 
 class TestAnchoring:

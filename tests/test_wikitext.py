@@ -133,6 +133,73 @@ class TestBranching:
         assert [f.lemma for f in step.forms] == ["capo", "lavoro"]
         assert all(f.language == "it" for f in step.forms)
 
+    @pytest.mark.parametrize(
+        "phrase, relation",
+        [
+            ("From", Relation.DERIVED),
+            ("Derived from", Relation.DERIVED),
+            ("Reformed from", Relation.DERIVED),
+            ("Deverbal of", Relation.DEVERBAL),
+            ("Diminutive of", Relation.DIMINUTIVE),
+            ("Augmentative of", Relation.AUGMENTATIVE),
+            ("Clipping of", Relation.CLIPPING),
+        ],
+    )
+    def test_explicit_prose_governor_licenses_same_language_mention(
+        self, phrase, relation
+    ):
+        analysis = parse(f"{phrase} {{{{m|it|abside}}}}.", "it")
+        assert len(analysis.steps) == 1
+        assert analysis.steps[0].relation is relation
+        assert [(form.language, form.lemma) for form in analysis.steps[0].forms] == [
+            ("it", "abside")
+        ]
+
+    def test_prose_compound_joins_the_governed_mentions(self):
+        analysis = parse(
+            "From {{m|it|acqua}} + {{m|it|ragia}}.",
+            "it",
+        )
+        assert len(analysis.steps) == 1
+        assert analysis.steps[0].relation is Relation.COMPOUND
+        assert [form.lemma for form in analysis.steps[0].forms] == ["acqua", "ragia"]
+
+    def test_conditioned_prose_derivation_remains_a_hypothesis(self):
+        analysis = parse("Probably derived from {{m|it|cagione}}.", "it")
+        assert analysis.steps == []
+        assert [hypothesis.form.lemma for hypothesis in analysis.hypotheses] == [
+            "cagione"
+        ]
+
+    def test_competing_governed_mentions_remain_hypotheses(self):
+        analysis = parse(
+            "From {{m|it|acqua}} or {{m|it|ragia}}.",
+            "it",
+        )
+        assert analysis.steps == []
+        assert [hypothesis.form.lemma for hypothesis in analysis.hypotheses] == [
+            "acqua",
+            "ragia",
+        ]
+
+    @pytest.mark.parametrize(
+        "sentence",
+        [
+            "Compare {{m|it|ino}}.",
+            "See {{m|it|abbigliare}}.",
+            "Feminine of {{m|it|alunno}}.",
+            "Masculine of {{m|it|alunna}}.",
+            "Plural of {{m|it|cane}}.",
+            "Past participle of {{m|it|accostare}}.",
+            "Alternative spelling of {{m|it|alcool}}.",
+        ],
+    )
+    def test_mentions_without_a_derivational_governor_are_not_ancestors(self, sentence):
+        assert parse(sentence, "it").steps == []
+
+    def test_cross_language_bare_from_mention_is_not_assigned_a_relation(self):
+        assert parse("From {{m|la|aqua}}.", "it").steps == []
+
     def test_component_from_another_language(self):
         analysis = parse("{{af|it|auto-|la:mobilis}}", "it")
         assert [f.language for f in analysis.steps[0].forms] == ["it", "la"]
