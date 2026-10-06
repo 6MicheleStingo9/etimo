@@ -1007,14 +1007,19 @@ _CONDITIONING = re.compile(
     r"\b(?:possibly|perhaps|probably|maybe|apparently|presumably|"
     r"alternatively|less\s+likely|more\s+likely|traditionally|"
     r"said\s+to\s+be|thought\s+to\s+be|may\s+be|might\s+be|could\s+be|"
-    r"uncertain|unclear|disputed)\b",
+    r"uncertain|unclear|disputed|suggests?|proposes?|proposed|"
+    r"argues?(?!\s+the\s+opposite\b)|posits?|speculates?|"
+    r"another\s+theory|some\s+scholars|derived\s+by\s+others\s+from)\b",
     re.I,
 )
 
 # A conditioning marker governs forward through commas — "Possibly X or Y" is
-# one marker over two candidates — and is released only by the end of the
-# sentence.
+# one marker over two candidates — but a comma that introduces the next link
+# releases it. A comma before an alternative coordinator is not a release.
 _SENTENCE_END = re.compile(r"[.;:]")
+_CONDITIONING_BOUNDARY = re.compile(
+    r"[.;:]|,(?!\s*(?:and/or|or(?:\s+(?:alternatively|else))?)\b)", re.I
+)
 
 # Two analyses offered side by side, with nothing choosing between them:
 # "From {{af|it|di-|pelo|-are}} **or** from {{inh|it|la|dēpilō}}". The marker
@@ -1251,21 +1256,22 @@ def _parse_body(body: str, entry_language: str) -> Analysis:
         else:
             lead_in += str(node)
 
-    # True while a conditioning marker is in force. It survives commas, so that
-    # "Possibly X or Y" covers both candidates, and is released by the end of
-    # the sentence.
+    # A marker survives only within its clause. A comma releases it unless it
+    # introduces coordinated alternatives, where it still governs both.
     conditioned = False
 
     for position, (lead_in, tpl) in enumerate(sequence):
         readable_lead_in = _plain_text(lead_in)
-        if _SENTENCE_END.search(lead_in):
+        conditioning_clause = _CONDITIONING_BOUNDARY.split(lead_in)[-1]
+        if _CONDITIONING_BOUNDARY.search(lead_in):
             conditioned = False
-        if _CONDITIONING.search(readable_lead_in):
+        readable_conditioning_clause = _plain_text(conditioning_clause)
+        if _CONDITIONING.search(readable_conditioning_clause):
             conditioned = True
         elif (
             not conditioned
             and not _SENTENCE_END.search(lead_in)
-            and _ALTERNATION.search(readable_lead_in)
+            and _ALTERNATION.search(readable_conditioning_clause)
             and analysis.steps
         ):
             # Only when the preceding template was asserted. Under a marker
