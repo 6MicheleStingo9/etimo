@@ -8,17 +8,24 @@ The corpus survey's first slice — 6 805 entries — held **128 lemmas that hav
 an Etymology section and yield no chain**. Each was fetched and its Italian
 Etymology section read and classified by shape.
 
-**121 of 128 were resolved.** Seven still fail on the network (`acidulare`,
-`acidulato`, `acusma`, `aerobox`, `aggraziato`, `alcmanio`, `allotropia`) and
-are counted separately, not silently folded into a class.
+**The first pass resolved 121 of 128.** Seven failed on the network
+(`acidulare`, `acidulato`, `acusma`, `aerobox`, `aggraziato`, `alcmanio`,
+`allotropia`) and were counted separately, not silently folded into a class.
+A live retry on 2026-10-07 classified the current source for all seven; it is
+recorded below. That retry does not recreate the source snapshot from the
+first pass, so the category counts remain a historical summary, not a
+reproducible census.
 
-*Provenance.* The counts below are the completed retry pass's own summary, and
-they sum to 128. The raw classification file it wrote was then damaged: a
-second retry pass of mine was still running against the same file, hit
-Wiktionary's rate limiter, and its write clobbered several entries the first
-pass had resolved — a plain lost update between two of my own background jobs.
-The damaged file shows 8 unresolved instead of 7. It is not the source of these
-figures, and re-deriving it costs one clean pass once the limiter releases.
+*Provenance.* The counts below are the completed classification run's own
+summary, and they sum to 128. The raw classification file it wrote was then
+damaged: a second retry pass of mine was still running against the same file,
+hit Wiktionary's rate limiter, and its write clobbered several entries the
+first pass had resolved — a plain lost update between two of my own
+background jobs.
+The damaged file shows 8 unresolved instead of 7, so it cannot support a
+row-level audit. The figures below come from the first pass's completed
+summary. Reconstructing a row-by-row classification would require a new clean
+pass; the retry below does not recover the first pass's source snapshot.
 
 **Two things this does not establish.** The slice ran alphabetically from `'`
 to `ammannare`, so it is rich in `a-` parasynthetic verbs and their derivatives
@@ -27,7 +34,30 @@ here should be treated as an upper bound until the hash-ordered survey produces
 a representative slice. And the classification is by the *shape* of the
 section, not by whether the reading it implies is correct.
 
-## The count
+## Follow-up: the seven network-limited entries
+
+Each page was fetched again from en.wiktionary.org on 2026-10-07, then read
+through the current parser. The live source had changed or become readable
+enough to resolve the original network limitation:
+
+| lemma | current source | current Etimo result | classification |
+| --- | --- | --- | --- |
+| `acidulare` | `{{rfe|it}}` | terminal: no etymology recorded | The source explicitly says an etymology is still wanted; no ancestor should be inferred. |
+| `acidulato` | no Etymology section; the Participle section says `{{past participle of|it|acidulare}}` | follows `acidulare`, whose source has `{{rfe|it}}` | No longer a member of the original population as currently written; the form pointer is not an etymological link. |
+| `acusma` | `{{rfe|it}}` | terminal: no etymology recorded | Same declared absence as `acidulare`. |
+| `aerobox` | `{{pseudo-loan|it|en}}`; compares Polish `aeroboks` | records a pseudo-loan modelled on English; leaves the Polish comparison out of the ancestry | No English lexical form is supplied, and the comparison is not a descent. No false ancestor is drawn. |
+| `aggraziato` | `From {{m|it|aggraziare}}.` | derived from `aggraziare` | The current prose-mention reader handles this explicit same-language relation. |
+| `alcmanio` | `From {{m|it|Alcmane}}.` | derived from `Alcmane` | The current prose-mention reader handles this explicit same-language relation. |
+| `allotropia` | two alternative `{{af}}` analyses with no shared form | keeps the components as hypotheses and draws no ancestor | Correct abstention; this negative guardrail is covered by the daily `competing-analyses` expectations. |
+
+This closes the *classification* of the seven current pages, not the lost
+provenance of the first pass. In particular, the original distribution below
+still relies on the first pass's summary rather than a recoverable row-by-row
+classification file. `aerobox` also illustrates why a prose note is not
+automatically a lexical ancestor: the source names a model language and a
+comparison, but no English form.
+
+## The first-pass count (historical)
 
 | class | n | % | ours or the source's? |
 | --- | ---: | ---: | --- |
@@ -36,7 +66,7 @@ section, not by whether the reading it implies is correct.
 | no Etymology section (variants, participles) | 14 | 10.9% | see below |
 | competing analyses recognised | 10 | 7.8% | correct — mostly |
 | relation present, form withheld | 10 | 7.8% | **partly ours** |
-| unresolved (network) | 7 | 5.5% | — |
+| unresolved (network; retried below) | 7 | 5.5% | — |
 | mention without a governing verb | 5 | 3.9% | **ours** |
 | cognate only | 4 | 3.1% | correct |
 | bare prose | 3 | 2.3% | mixed |
@@ -57,9 +87,11 @@ out of the chain. A live recheck covered the ten examples listed below:
 nine now produce a chain and `accagionare` remains a hypothesis because its
 entry says *probably*. The additional controls `amarena`, `alunna` and
 `accosto` (sense 2) respectively produce a chain, remain unlinked as an
-inflection, and retain their existing deverbal link. The committed issue and
-this document preserve only ten of the claimed 52 names, so the original
-52-entry total and phrase frequencies could not be independently reproduced.
+inflection, and retain their existing deverbal link. The original first pass
+preserves only ten of the claimed 52 names; the two same-language cases in the
+later network retry are not evidence that they belonged to that original
+class. The 52-entry total and phrase frequencies could not be independently
+reproduced.
 
 ```
 absidiola      From {{m|it|abside}}.
