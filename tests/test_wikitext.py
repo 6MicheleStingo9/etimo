@@ -697,6 +697,60 @@ class TestConditioningMarkers:
         assert analysis.hypotheses[1].attribution is None
 
 
+class TestSharedBasesInAlternatives:
+    def test_a_base_shared_by_both_analyses_is_drawn(self):
+        analysis = parse(
+            "From {{af|it|agnello|-ellino}} or {{af|it|agnello|-ino|id2=diminutive}}.",
+            "it",
+        )
+        assert len(analysis.steps) == 1
+        assert analysis.steps[0].relation is Relation.DERIVED
+        assert [form.lemma for form in analysis.steps[0].forms] == ["agnello"]
+        assert [hypothesis.form.lemma for hypothesis in analysis.hypotheses] == [
+            "-ellino",
+            "-ino",
+        ]
+
+    def test_alternatives_with_no_shared_base_stay_as_hypotheses(self):
+        analysis = parse(
+            "From {{af|it|allo-|-tropia}} or {{af|it|allotropo|-ia}}.",
+            "it",
+        )
+        assert analysis.steps == []
+        assert [hypothesis.form.lemma for hypothesis in analysis.hypotheses] == [
+            "allo-",
+            "-tropia",
+            "allotropo",
+            "-ia",
+        ]
+
+    def test_a_shared_suffix_is_not_promoted_as_an_ancestor(self):
+        analysis = parse(
+            "From {{suffix|it|acquattare|mento}} or {{suffix|it|acquattarsi|mento}}.",
+            "it",
+        )
+        assert analysis.steps == []
+        assert [hypothesis.form.lemma for hypothesis in analysis.hypotheses] == [
+            "acquattare",
+            "mento",
+            "acquattarsi",
+            "mento",
+        ]
+
+    def test_competing_linear_and_formation_readings_stay_unlinked(self):
+        analysis = parse(
+            "From {{af|it|di-|-are|pelo}} or from {{inh|it|la|dēpilō}}.",
+            "it",
+        )
+        assert analysis.steps == []
+        assert [hypothesis.form.lemma for hypothesis in analysis.hypotheses] == [
+            "di-",
+            "-are",
+            "pelo",
+            "dēpilō",
+        ]
+
+
 class TestLemmaIsNeverCorrupted:
     """A lemma carrying our own markup becomes a page title that cannot exist.
 

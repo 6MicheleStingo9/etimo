@@ -201,6 +201,24 @@ class TestNoInventedFacts:
         assert result.start.source_text is None
         assert "etymology not interpreted" not in tree(result, PLAIN)
 
+    def test_only_the_base_shared_by_competing_analyses_enters_the_tree(self):
+        pages = {
+            "agnellino": entry(
+                "Italian",
+                "From {{af|it|agnello|-ellino}} or {{af|it|agnello|-ino}}.",
+            ),
+            "agnello": entry("Italian", "Of uncertain origin."),
+        }
+        result = walk(pages, "agnellino")
+        assert [
+            (child.form.lemma, child.relation) for child in result.start.children
+        ] == [("agnello", Relation.DERIVED)]
+        assert [hypothesis.form.lemma for hypothesis in result.start.hypotheses] == [
+            "-ellino",
+            "-ino",
+        ]
+        assert "etymology not interpreted" not in tree(result, PLAIN)
+
 
 class TestDescendantsAreNotAncestors:
     def test_the_body_stops_at_the_first_subheading(self):

@@ -1143,7 +1143,26 @@ def _connective_before(text: str) -> str:
     return ""
 
 
-def _demote_last_step(analysis: Analysis, lead_in: str) -> None:
+def _alternative_base_forms(forms: list[Form], tpl: Template) -> list[Form]:
+    """Keep lexical bases, excluding affixes, from one alternative."""
+    name = _normalize_name(tpl.name)
+    if name in {"suf", "suffix"}:
+        forms = forms[:-1]
+    elif name in {"pre", "pref", "prefix"}:
+        forms = forms[1:]
+    return [
+        form
+        for form in forms
+        if not form.lemma.startswith("-") and not form.lemma.endswith("-")
+    ]
+
+
+def _alternative_form_key(form: Form) -> tuple[str, str]:
+    """Compare the exact cited form, keeping reconstruction marks significant."""
+    return form.language, form.lemma.casefold()
+
+
+def _demote_last_step(analysis: Analysis, lead_in: str) -> list[Hypothesis]:
     """Move the step just recorded among the conjectures.
 
     Used when the text turns out to offer an alternative to it: what looked
@@ -1151,13 +1170,50 @@ def _demote_last_step(analysis: Analysis, lead_in: str) -> None:
     not choose.
     """
     if not analysis.steps:
-        return
+        return []
     step = analysis.steps.pop()
-    analysis.hypotheses.extend(
+    moved = [
         Hypothesis(form=form, attribution=_qualifying_phrase(lead_in))
         for form in step.forms
         if form.lemma
-    )
+    ]
+    analysis.hypotheses.extend(moved)
+    return moved
+
+
+def _promote_shared_alternative_bases(
+    analysis: Analysis,
+    alternatives: list[tuple[list[Form], list[Hypothesis]]],
+) -> None:
+    """Draw only lexical bases present in every parsed alternative."""
+    if len(alternatives) < 2 or any(not bases for bases, _ in alternatives):
+        return
+
+    shared_keys = {_alternative_form_key(form) for form in alternatives[0][0]}
+    for bases, _ in alternatives[1:]:
+        shared_keys.intersection_update(_alternative_form_key(form) for form in bases)
+    if not shared_keys:
+        return
+
+    shared_forms: list[Form] = []
+    seen_shared_keys: set[tuple[str, str]] = set()
+    for form in alternatives[0][0]:
+        key = _alternative_form_key(form)
+        if key in shared_keys and key not in seen_shared_keys:
+            shared_forms.append(form)
+            seen_shared_keys.add(key)
+    promoted_hypotheses = {
+        id(hypothesis)
+        for _, hypotheses in alternatives
+        for hypothesis in hypotheses
+        if _alternative_form_key(hypothesis.form) in shared_keys
+    }
+    analysis.hypotheses = [
+        hypothesis
+        for hypothesis in analysis.hypotheses
+        if id(hypothesis) not in promoted_hypotheses
+    ]
+    analysis.steps.append(Step(relation=Relation.DERIVED, forms=shared_forms))
 
 
 def _qualifying_phrase(lead_in: str) -> str | None:
@@ -1305,6 +1361,8 @@ def _parse_body(body: str, entry_language: str) -> Analysis:
     # A marker survives only within its clause. A comma releases it unless it
     # introduces coordinated alternatives, where it still governs both.
     conditioned = False
+    collecting_alternatives = False
+    alternatives: list[tuple[list[Form], list[Hypothesis]]] = []
 
     for position, (lead_in, tpl) in enumerate(sequence):
         readable_lead_in = _plain_text(lead_in)
@@ -1327,7 +1385,16 @@ def _parse_body(body: str, entry_language: str) -> Analysis:
             # An alternative to what precedes: the step already recorded was
             # never asserted on its own, so it joins the conjectures too.
             conditioned = True
-            _demote_last_step(analysis, readable_lead_in)
+            preceding_step = analysis.steps[-1]
+            previous_template = sequence[position - 1][1] if position else tpl
+            moved = _demote_last_step(analysis, readable_lead_in)
+            alternatives.append(
+                (
+                    _alternative_base_forms(preceding_step.forms, previous_template),
+                    moved,
+                )
+            )
+            collecting_alternatives = True
 
         name = _normalize_name(tpl.name)
         connective = _connective_before(lead_in)
@@ -1363,6 +1430,7 @@ def _parse_body(body: str, entry_language: str) -> Analysis:
 
                 if conditioned:
                     # Proposed, not asserted: it goes where conjectures go.
+                    first_new_hypothesis = len(analysis.hypotheses)
                     analysis.hypotheses.extend(
                         Hypothesis(
                             form=candidate,
@@ -1371,6 +1439,13 @@ def _parse_body(body: str, entry_language: str) -> Analysis:
                         for candidate in forms
                         if candidate.lemma
                     )
+                    if collecting_alternatives and _ALTERNATION.search(
+                        readable_conditioning_clause
+                    ):
+                        new_hypotheses = analysis.hypotheses[first_new_hypothesis:]
+                        alternatives.append(
+                            (_alternative_base_forms(forms, tpl), new_hypotheses)
+                        )
                     continue
 
                 _place_step(
@@ -1397,6 +1472,7 @@ def _parse_body(body: str, entry_language: str) -> Analysis:
             elif forms and conditioned:
                 # An analysis into parts can be conjectural like any other:
                 # "apparently from rodo + monte" proposes, it does not assert.
+                first_new_hypothesis = len(analysis.hypotheses)
                 analysis.hypotheses.extend(
                     Hypothesis(
                         form=candidate,
@@ -1405,6 +1481,13 @@ def _parse_body(body: str, entry_language: str) -> Analysis:
                     for candidate in forms
                     if candidate.lemma
                 )
+                if collecting_alternatives and _ALTERNATION.search(
+                    readable_conditioning_clause
+                ):
+                    new_hypotheses = analysis.hypotheses[first_new_hypothesis:]
+                    alternatives.append(
+                        (_alternative_base_forms(forms, tpl), new_hypotheses)
+                    )
             elif forms:
                 _place_step(
                     analysis,
@@ -1517,6 +1600,8 @@ def _parse_body(body: str, entry_language: str) -> Analysis:
             analysis.notes.append(
                 f"{_REMARKS[name]} «{target}»" if target else _REMARKS[name]
             )
+
+    _promote_shared_alternative_bases(analysis, alternatives)
 
     if not analysis.uncertain and _UNCERTAINTY_IN_PROSE.search(_plain_text(body)):
         analysis.uncertain = True

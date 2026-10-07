@@ -205,6 +205,10 @@ whose sibling `ahi` says «Of onomatopoeic origin».
 Not a class of its own in the count — these show as "recognised" — but visible
 inside it:
 
+**Status:** the parser now promotes the shared lexical base in `agnellino`;
+`allotropia` (no shared form) and `acquattamento` (shared suffix only) remain
+unlinked. The daily expectation seed now covers all three cases.
+
 ```
 agnellino       From {{af|it|agnello|-ellino}} or {{af|it|agnello|-ino}}.
 allotropia      From {{af|it|allo-|-tropia}} or {{af|it|allotropo|-ia}}.
