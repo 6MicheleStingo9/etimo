@@ -95,18 +95,19 @@ acquattamento:  From {{suffix|it|acquattare|mento}} or {{suffix|it|acquattarsi|m
 allotropia:     From {{af|it|allo-|-tropia}} or {{af|it|allotropo|-ia}}.
 ```
 
-In the first two the analyses **disagree about the suffix and agree about the
-base**. `agnellino` comes from `agnello` under either reading; `acquattamento`
-from the verb `acquattare` in either its plain or reflexive form. Refusing to
-draw anything discards a fact both alternatives assert.
+In `agnellino` the analyses **disagree about the suffix and agree about the
+base**. It comes from `agnello` under either reading; refusing to draw it
+discards a fact both alternatives assert.
 
-`allotropia` is the case where the caution is right: the two analyses share no
-form, so nothing is certain but the result.
+`allotropia` shares no form. `acquattamento` shares only the suffix `mento`;
+its analyses name different bases, `acquattare` and `acquattarsi`. Neither case
+licenses a common ancestor.
 
-**The rule this yields**: when competing analyses are recorded as hypotheses,
-any form that appears in *every* one of them is asserted by the entry and may
-be drawn. A form appearing in some but not all may not. This distinguishes the
-first two cases from the third without a judgement call.
+**The rule**: when competing analyses are recorded as hypotheses, a form
+appearing in *every* one may be drawn only if at least one shared form is a
+lexical base rather than an affix. Shared forms appearing in some but not all
+alternatives are not asserted across them. This promotes `agnello`, but leaves
+both `allotropia` and `acquattamento` unlinked.
 
 ### An inflected form resolves to its lemma, and the resolution can hide a section
 

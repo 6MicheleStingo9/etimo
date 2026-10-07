@@ -260,5 +260,61 @@
       "must_include_hypotheses": ["datum::la"],
       "must_not_include_forms": ["datum::la"]
     }
+  },
+  {
+    "word": "agnellino",
+    "language": "it",
+    "category": "competing-analyses",
+    "why": "Both affixal analyses contain the base `agnello` but differ in suffix. The shared base is asserted by both alternatives and belongs in the chain; the suffixes remain hypotheses.",
+    "manual_review": false,
+    "expected": {
+      "must_include_relations": ["derived"],
+      "must_include_forms": ["agnello::it"],
+      "must_include_hypotheses": ["-ellino::it", "-ino::it"],
+      "must_not_include_hypotheses": ["agnello::it"],
+      "must_not_include_forms": ["-ellino::it", "-ino::it"]
+    }
+  },
+  {
+    "word": "allotropia",
+    "language": "it",
+    "category": "competing-analyses",
+    "why": "The two affixal analyses share no lexical base. Keep all components as hypotheses and draw no component as an ancestor.",
+    "manual_review": false,
+    "expected": {
+      "must_include_terminals": ["not_interpreted"],
+      "must_include_hypotheses": [
+        "allo-::it",
+        "-tropia::it",
+        "allotropo::it",
+        "-ia::it"
+      ],
+      "must_not_include_forms": [
+        "allo-::it",
+        "-tropia::it",
+        "allotropo::it",
+        "-ia::it"
+      ]
+    }
+  },
+  {
+    "word": "acquattamento",
+    "language": "it",
+    "category": "competing-analyses",
+    "why": "The analyses share only the suffix `mento`, not a lexical base. The suffix must remain a hypothesis and must not be drawn as an ancestor.",
+    "manual_review": false,
+    "expected": {
+      "must_include_terminals": ["not_interpreted"],
+      "must_include_hypotheses": [
+        "acquattare::it",
+        "mento::it",
+        "acquattarsi::it"
+      ],
+      "must_not_include_forms": [
+        "acquattare::it",
+        "mento::it",
+        "acquattarsi::it"
+      ]
+    }
   }
 ]
