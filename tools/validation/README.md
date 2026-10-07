@@ -119,6 +119,12 @@ Thus historical totals remain comparable while newly surveyed entries use the
 split. The same compatibility count is reported for lemmas as
 `legacy_outcomes_for_lemmas`, alongside the refined `outcomes_for_lemmas`.
 
+This is the normal append-only path. When a measurement is deliberately
+invalidated — for example, a known-biased prefix — a reviewed change may remove
+only that precisely identified subset so it becomes pending again. The prior
+measurements remain in Git history; the next survey appends refreshed rows in
+the deterministic hash order. Never remove unrelated rows.
+
 ### Anchoring: the one check that does not use the parser's tables
 
 Alongside where the walk reached, the survey records whether **every form it
