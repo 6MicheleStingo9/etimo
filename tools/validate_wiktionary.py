@@ -774,6 +774,11 @@ def _select_batch(
             for item in queue
             if item.get("status") not in {"blocked", "pass", "fail", "archived"}
             and item.get("word")
+            and (
+                item.get("word", ""),
+                item.get("language", "it"),
+                item.get("sense"),
+            ) not in selected_keys
         ]
         fallback = _diverse_pool_pick(
             sorted(remaining, key=_queue_sort_key), batch_size - len(selected)
