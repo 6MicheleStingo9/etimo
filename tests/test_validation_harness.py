@@ -360,6 +360,43 @@ def test_select_batch_respects_quota_targets():
     assert sum(1 for it in batch if it["status"] == "manual_review") >= 1
 
 
+def test_top_up_excludes_items_already_selected_from_a_pool():
+    queue = [
+        {
+            "word": f"new-{idx:03}",
+            "language": "it",
+            "category": "general",
+            "status": "pending",
+            "priority": 40,
+            "attempts": 0,
+            "load": ["alternation"],
+        }
+        for idx in range(100)
+    ]
+    queue.extend(
+        {
+            "word": f"old-{idx:03}",
+            "language": "it",
+            "category": "general",
+            "status": "pass",
+            "priority": 40,
+            "attempts": 1,
+            "load": ["alternation"],
+            "last_validated": "2000-01-01T00:00:00+00:00",
+            "revalidate_days": 30,
+        }
+        for idx in range(100)
+    )
+
+    batch = _select_batch(queue, batch_size=100, revalidate_days=30)
+
+    keys = {(item["word"], item["language"], item.get("sense")) for item in batch}
+    assert len(batch) == 100
+    assert len(keys) == 100
+    assert sum(item["status"] == "pending" for item in batch) == 85
+    assert sum(item["status"] == "pass" for item in batch) == 15
+
+
 def test_source_diagnostics_distinguish_regression_from_drift():
     same = _classify_source_diagnostic("sha1", "sha1", "EXPECTED_FACT_MISSING")
     changed = _classify_source_diagnostic("sha1", "sha2", "EXPECTED_FACT_MISSING")
