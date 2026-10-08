@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from copy import deepcopy
 from datetime import timedelta
 from pathlib import Path
 
@@ -27,6 +28,7 @@ from tools.validate_wiktionary import (  # noqa: E402
     _load_word_list,
     _next_period,
     _run_single_case,
+    _save_ledger,
     _select_batch,
     _utc_now,
     _verify_fidelity_invariants,
@@ -76,6 +78,115 @@ def test_seed_and_load_ledger(tmp_path: Path):
     allogliato = next(it for it in items if it["word"] == "allogliato")
     assert allogliato["status"] == "manual_review"
     assert allogliato["priority"] == 80 + 25
+
+
+def test_compacted_ledger_rebuilds_seed_rows_without_changing_the_batch(
+    tmp_path: Path,
+):
+    seed_file = tmp_path / "sample.json"
+    queue_file = tmp_path / "ledger.json"
+    seed_cases = [
+        {
+            "word": f"new-{idx:03}",
+            "category": "general",
+            "load": ["alternation"] if idx % 2 else ["non_ancestor"],
+        }
+        for idx in range(100)
+    ]
+    seed_cases.extend(
+        {"word": f"old-{idx:03}", "category": "general"}
+        for idx in range(100)
+    )
+    seed_file.write_text(json.dumps(seed_cases), encoding="utf-8")
+
+    ledger = _load_ledger(queue_file, seed_file)
+    default_first_seen = ledger["corpus_metadata"]["default_first_seen"]
+    for item in ledger["items"][100:]:
+        item.update(
+            {
+                "status": "pass",
+                "priority": 45,
+                "attempts": 1,
+                "consecutive_passes": 1,
+                "last_validated": "2000-01-01T00:00:00+00:00",
+                "last_result": "pass",
+                "source_hash": "stable",
+            }
+        )
+    ledger["items"].append(
+        {
+            "word": "legacy-orphan",
+            "language": "it",
+            "category": "general",
+            "status": "pending",
+            "priority": 50,
+            "attempts": 0,
+            "consecutive_passes": 0,
+            "first_seen": default_first_seen,
+            "last_validated": None,
+            "next_due_at": None,
+            "last_batch_id": None,
+            "last_result": None,
+            "last_failure_class": None,
+            "source_hash": None,
+            "diagnostic_class": None,
+            "manual_review": False,
+            "manual_review_reason": None,
+            "expected": {},
+        }
+    )
+
+    expected = _select_batch(deepcopy(ledger["items"]), batch_size=100)
+    expected_keys = [
+        (item["word"], item.get("language", "it"), item.get("sense"))
+        for item in expected
+    ]
+    coverage = _coverage_summary(ledger["items"])
+    _save_ledger(queue_file, ledger, seed_file)
+
+    persisted = json.loads(queue_file.read_text(encoding="utf-8"))
+    assert len(persisted["items"]) == 101
+    assert "legacy-orphan" in {item["word"] for item in persisted["items"]}
+    assert persisted["corpus_metadata"]["default_first_seen"] == default_first_seen
+
+    restored = _load_ledger(queue_file, seed_file)
+    restored_items = restored["items"]
+    assert len(restored_items) == 201
+    assert _coverage_summary(restored_items) == coverage
+    assert all(
+        item["first_seen"] == default_first_seen
+        for item in restored_items
+        if item["word"].startswith("new-")
+    )
+    restored_new_items = [
+        item for item in restored_items if item["word"].startswith("new-")
+    ]
+    assert all("load" in item for item in restored_new_items)
+
+    actual = _select_batch(deepcopy(restored_items), batch_size=100)
+    actual_keys = [
+        (item["word"], item.get("language", "it"), item.get("sense"))
+        for item in actual
+    ]
+    assert actual_keys == expected_keys
+
+
+def test_empty_compacted_ledger_keeps_its_seed_timestamp(tmp_path: Path):
+    seed_file = tmp_path / "sample.json"
+    queue_file = tmp_path / "ledger.json"
+    seed_file.write_text(
+        json.dumps([{"word": "fuoco"}, {"word": "riso"}]), encoding="utf-8"
+    )
+
+    initial = _load_ledger(queue_file, seed_file)
+    first_seen = initial["corpus_metadata"]["default_first_seen"]
+    persisted = json.loads(queue_file.read_text(encoding="utf-8"))
+    assert persisted["items"] == []
+
+    restored = _load_ledger(queue_file, seed_file)
+    assert [item["word"] for item in restored["items"]] == ["fuoco", "riso"]
+    assert all(item["first_seen"] == first_seen for item in restored["items"])
+    assert json.loads(queue_file.read_text(encoding="utf-8"))["items"] == []
 
 
 def test_select_batch_stratification():

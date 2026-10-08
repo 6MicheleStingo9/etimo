@@ -261,36 +261,43 @@ def _default_priority_for_case(case: dict[str, Any]) -> int:
     return base + int(bool(case.get("manual_review")) * 25)
 
 
+def _new_queue_item(case: dict[str, Any], first_seen: str) -> dict[str, Any]:
+    item: dict[str, Any] = {
+        "word": case["word"],
+        "language": case.get("language", "it"),
+        "category": case.get("category", "general"),
+        "status": _default_status_for_case(case),
+        "priority": case.get("priority", _default_priority_for_case(case)),
+        "attempts": 0,
+        "consecutive_passes": 0,
+        "first_seen": first_seen,
+        "last_validated": None,
+        "next_due_at": None,
+        "last_batch_id": None,
+        "last_result": None,
+        "last_failure_class": None,
+        "source_hash": None,
+        "diagnostic_class": None,
+        "manual_review": bool(case.get("manual_review")),
+        "manual_review_reason": case.get("manual_review_reason"),
+        "expected": case.get("expected", {}),
+    }
+    if "sense" in case:
+        item["sense"] = case["sense"]
+    if "load" in case:
+        item["load"] = case["load"]
+    return item
+
+
 def _seed_queue(seed_file: Path) -> dict[str, Any]:
     cases = _load_word_list(seed_file)
+    first_seen = _utc_now_iso()
     items: list[dict[str, Any]] = []
     for case in cases:
         word = case.get("word")
         if not word:
             continue
-        item: dict[str, Any] = {
-            "word": word,
-            "language": case.get("language", "it"),
-            "category": case.get("category", "general"),
-            "status": _default_status_for_case(case),
-            "priority": case.get("priority", _default_priority_for_case(case)),
-            "attempts": 0,
-            "consecutive_passes": 0,
-            "first_seen": _utc_now_iso(),
-            "last_validated": None,
-            "next_due_at": None,
-            "last_batch_id": None,
-            "last_result": None,
-            "last_failure_class": None,
-            "source_hash": None,
-            "diagnostic_class": None,
-            "manual_review": bool(case.get("manual_review")),
-            "manual_review_reason": case.get("manual_review_reason"),
-            "expected": case.get("expected", {}),
-        }
-        if "sense" in case:
-            item["sense"] = case["sense"]
-        items.append(item)
+        items.append(_new_queue_item(case, first_seen))
 
     corpus_metadata = {
         "snapshot_id": f"corpus-{_utc_now().strftime('%Y%m%d')}",
@@ -300,22 +307,82 @@ def _seed_queue(seed_file: Path) -> dict[str, Any]:
         "total_corpus_lemmas": len(items),
         "seed_file": str(seed_file.name),
         "last_updated": _utc_now_iso(),
+        "default_first_seen": first_seen,
     }
 
     return {"corpus_metadata": corpus_metadata, "items": items}
 
 
+_QUEUE_ITEM_FIELDS = {
+    "word",
+    "language",
+    "category",
+    "status",
+    "priority",
+    "attempts",
+    "consecutive_passes",
+    "first_seen",
+    "last_validated",
+    "next_due_at",
+    "last_batch_id",
+    "last_result",
+    "last_failure_class",
+    "source_hash",
+    "diagnostic_class",
+    "manual_review",
+    "manual_review_reason",
+    "expected",
+    "sense",
+    "load",
+    "load_measured",
+}
+
+
+def _queue_item_key(item: dict[str, Any]) -> tuple[Any, Any, Any]:
+    return (item.get("word"), item.get("language", "it"), item.get("sense"))
+
+
+def _is_reconstructable_seed_item(
+    item: dict[str, Any], seed_keys: set[tuple[Any, Any, Any]]
+) -> bool:
+    if (
+        _queue_item_key(item) not in seed_keys
+        or item.get("status") != "pending"
+        or item.get("attempts", 0) != 0
+        or item.get("consecutive_passes", 0) != 0
+        or item.get("priority") != _default_priority_for_case(item)
+        or item.get("load_measured") is True
+        or set(item) - _QUEUE_ITEM_FIELDS
+    ):
+        return False
+
+    state_fields = (
+        "last_validated",
+        "next_due_at",
+        "last_batch_id",
+        "last_result",
+        "last_failure_class",
+        "source_hash",
+        "diagnostic_class",
+        "parser_fingerprint",
+        "revalidate_days",
+    )
+    return not any(item.get(field) is not None for field in state_fields)
+
+
 def _load_ledger(queue_file: Path, seed_file: Path) -> dict[str, Any]:
     if not queue_file.exists():
         ledger = _seed_queue(seed_file)
-        _save_ledger(queue_file, ledger)
+        _save_ledger(queue_file, ledger, seed_file)
         return ledger
 
     payload = json.loads(queue_file.read_text(encoding="utf-8"))
     items = payload.get("items", [])
-    if not items:
+    if not isinstance(items, list):
+        raise ValueError(f"ledger items must be a list: {queue_file}")
+    if not items and not payload.get("corpus_metadata"):
         ledger = _seed_queue(seed_file)
-        _save_ledger(queue_file, ledger)
+        _save_ledger(queue_file, ledger, seed_file)
         return ledger
 
     # Sync any new words present in seed_file that are not in queue
@@ -337,6 +404,8 @@ def _load_ledger(queue_file: Path, seed_file: Path) -> dict[str, Any]:
         for case in seed_cases
         if case.get("load")
     }
+    corpus_meta = payload.get("corpus_metadata", {})
+    default_first_seen = corpus_meta.get("default_first_seen")
     refreshed = 0
     for item in items:
         if item.get("load_measured"):
@@ -354,32 +423,11 @@ def _load_ledger(queue_file: Path, seed_file: Path) -> dict[str, Any]:
         key = (case.get("word"), case.get("language", "it"), case.get("sense"))
         if key not in existing_keys and case.get("word"):
             items.append(
-                {
-                    "word": case["word"],
-                    "language": case.get("language", "it"),
-                    "category": case.get("category", "general"),
-                    "status": _default_status_for_case(case),
-                    "priority": case.get("priority", _default_priority_for_case(case)),
-                    "attempts": 0,
-                    "consecutive_passes": 0,
-                    "first_seen": _utc_now_iso(),
-                    "last_validated": None,
-                    "next_due_at": None,
-                    "last_batch_id": None,
-                    "last_result": None,
-                    "last_failure_class": None,
-                    "source_hash": None,
-                    "diagnostic_class": None,
-                    "manual_review": bool(case.get("manual_review")),
-                    "manual_review_reason": case.get("manual_review_reason"),
-                    "expected": case.get("expected", {}),
-                    **({"sense": case["sense"]} if "sense" in case else {}),
-                }
+                _new_queue_item(case, default_first_seen or _utc_now_iso())
             )
             existing_keys.add(key)
             added = True
 
-    corpus_meta = payload.get("corpus_metadata", {})
     corpus_meta["total_corpus_lemmas"] = len(items)
     corpus_meta["dataset_hash"] = _file_sha256(seed_file)
     corpus_meta["parser_version"] = ETIMO_VERSION
@@ -387,16 +435,40 @@ def _load_ledger(queue_file: Path, seed_file: Path) -> dict[str, Any]:
     payload["items"] = items
 
     if added:
-        _save_ledger(queue_file, payload)
+        _save_ledger(queue_file, payload, seed_file)
 
     return payload
 
 
-def _save_ledger(queue_file: Path, ledger: dict[str, Any]) -> None:
+def _save_ledger(
+    queue_file: Path, ledger: dict[str, Any], seed_file: Path
+) -> None:
     queue_file.parent.mkdir(parents=True, exist_ok=True)
+    seed_keys = {
+        _queue_item_key(case) for case in _load_word_list(seed_file) if case.get("word")
+    }
+    metadata = ledger.setdefault("corpus_metadata", {})
+    if not metadata.get("default_first_seen"):
+        first_seen = [
+            item["first_seen"]
+            for item in ledger.get("items", [])
+            if _is_reconstructable_seed_item(item, seed_keys)
+            and item.get("first_seen")
+        ]
+        metadata["default_first_seen"] = min(first_seen, default=_utc_now_iso())
     ledger["corpus_metadata"]["last_updated"] = _utc_now_iso()
+    default_first_seen_date = str(metadata["default_first_seen"])[:10]
+    persisted_items = [
+        item
+        for item in ledger.get("items", [])
+        if not (
+            _is_reconstructable_seed_item(item, seed_keys)
+            and str(item.get("first_seen", ""))[:10] == default_first_seen_date
+        )
+    ]
+    persisted_ledger = {**ledger, "items": persisted_items}
     queue_file.write_text(
-        json.dumps(ledger, ensure_ascii=False, indent=2), encoding="utf-8"
+        json.dumps(persisted_ledger, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
 
@@ -1467,7 +1539,7 @@ def main() -> int:
             category=args.invalidate_category,
             invalidate_all=args.invalidate_all,
         )
-        _save_ledger(args.queue_file, ledger)
+        _save_ledger(args.queue_file, ledger, args.seed_file)
         print(f"Invalidated {count} items in ledger for re-audit.")
         return 0
 
@@ -1562,7 +1634,7 @@ def main() -> int:
                 item["status"] = "retry"
                 item["priority"] = min(200, int(item.get("priority", 50)) + 10)
 
-    _save_ledger(args.queue_file, ledger)
+    _save_ledger(args.queue_file, ledger, args.seed_file)
 
     report = _build_report(processed, ledger, batch_id)
     args.output_dir.mkdir(parents=True, exist_ok=True)

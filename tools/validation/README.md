@@ -68,6 +68,17 @@ snapshot without `--force`, and `dataset_hash` is a digest of the lemmas
 themselves, so two runs seeing the same category agree and a run seeing a
 changed one says so.
 
+### Persistent audit ledger
+
+The corpus catalog is the source of truth for lemmas that have never been
+audited. Ordinary untouched pending entries are reconstructed in memory from
+the catalog on load. Their load estimates and initial timestamp are restored
+as well, so batch selection and backlog-age reporting do not change when the
+ledger is compacted. Entries with validation history, an independent
+`first_seen` date, an unrecognised state, or no matching catalog entry remain
+persisted. Reports and coverage counts use the complete in-memory queue, not
+only the compact file.
+
 ---
 
 ## The survey: a different question, deliberately apart
