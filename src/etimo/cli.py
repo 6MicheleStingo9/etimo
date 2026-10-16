@@ -279,6 +279,24 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_ERROR
 
 
+def _validate(options: argparse.Namespace) -> str | None:
+    """The checks that must pass before any request is made. None means go ahead."""
+    if not 1 <= options.depth <= MAX_DEPTH_ALLOWED:
+        return f"Depth must be between 1 and {MAX_DEPTH_ALLOWED}."
+
+    if options.cache_ttl < 0:
+        return "The cache lifetime cannot be negative. Use --no-cache to skip it."
+
+    # A wrong language code otherwise surfaces as a generic "no entry", sending
+    # the user to check a spelling that was never the problem.
+    if not is_known_language(options.language):
+        return (
+            f"«{options.language}» is not a language code we know.\n"
+            "Use Wiktionary codes: it (Italian), la (Latin), grc (Ancient Greek)…"
+        )
+    return None
+
+
 def _run(argv: list[str] | None) -> int:
     options = _arguments(argv)
 
@@ -306,27 +324,18 @@ def _run(argv: list[str] | None) -> int:
         return EXIT_OK
 
     if not options.word:
+        # A terminal and nobody named a word: there is somebody to talk to, so
+        # offer the loop instead of a one-line refusal. Piped or scripted
+        # invocations (no tty) get the refusal, as before.
+        if _interactive():
+            return _repl(options, warn)
         print("Name the word to reconstruct. Use --help for the options.",
               file=sys.stderr)
         return EXIT_ERROR
 
-    if not 1 <= options.depth <= MAX_DEPTH_ALLOWED:
-        print(f"Depth must be between 1 and {MAX_DEPTH_ALLOWED}.", file=sys.stderr)
-        return EXIT_ERROR
-
-    if options.cache_ttl < 0:
-        print("The cache lifetime cannot be negative. Use --no-cache to skip it.",
-              file=sys.stderr)
-        return EXIT_ERROR
-
-    # A wrong language code otherwise surfaces as a generic "no entry", sending
-    # the user to check a spelling that was never the problem.
-    if not is_known_language(options.language):
-        print(
-            f"«{options.language}» is not a language code we know.\n"
-            "Use Wiktionary codes: it (Italian), la (Latin), grc (Ancient Greek)…",
-            file=sys.stderr,
-        )
+    error = _validate(options)
+    if error:
+        print(error, file=sys.stderr)
         return EXIT_ERROR
 
     source: WikitextSource = WiktionaryClient(warn=warn)
@@ -340,6 +349,75 @@ def _run(argv: list[str] | None) -> int:
     )
     style = Style(enabled=not options.no_color)
 
+    try:
+        return _lookup(options, reconstructor, style)
+    finally:
+        closing = getattr(source, "close", None)
+        if closing is not None:
+            closing()
+
+
+def _repl(options: argparse.Namespace, warn: Callable[[str], None]) -> int:
+    """Look up several words without relaunching the command.
+
+    Settings given at launch — depth, language, chain/json, colour, cache —
+    hold for every word typed here; there is no per-line flag parsing. That
+    keeps this loop from becoming a second, drifting definition of what each
+    flag means, next to the single-shot command line.
+    """
+    error = _validate(options)
+    if error:
+        print(error, file=sys.stderr)
+        return EXIT_ERROR
+
+    source: WikitextSource = WiktionaryClient(warn=warn)
+    if not options.no_cache:
+        source = DiskCache(source, ttl_days=options.cache_ttl, warn=warn)
+
+    reconstructor = Reconstructor(
+        source,
+        max_depth=options.depth,
+        follow_compounds=not options.no_compounds,
+    )
+    style = Style(enabled=not options.no_color)
+
+    print(style.lemma("etimo") + style.dim(" — a word's history, root by root"))
+    print(style.dim("Type a word to trace its history. q, quit, or Ctrl-D to leave.\n"))
+
+    try:
+        while True:
+            try:
+                word = input(style.dim("etimo> ")).strip()
+            except (EOFError, KeyboardInterrupt):
+                print(file=sys.stderr)
+                return EXIT_OK
+
+            if not word:
+                continue
+            if word.casefold() in ("q", "quit", "exit"):
+                return EXIT_OK
+
+            # One word per iteration: everything but the word itself is
+            # carried over from the launch options.
+            query = argparse.Namespace(**vars(options))
+            query.word = word
+            query.sense = 1
+            query.sense_given = False
+            query.senses = False
+            query.as_lemma = None
+
+            _lookup(query, reconstructor, style)
+            print(file=sys.stderr)
+    finally:
+        closing = getattr(source, "close", None)
+        if closing is not None:
+            closing()
+
+
+def _lookup(
+    options: argparse.Namespace, reconstructor: Reconstructor, style: Style
+) -> int:
+    """Resolve one word and print its chain. The exit code reflects that word alone."""
     try:
         # Which word did they mean? Some spellings cover several unrelated
         # ones. This costs no extra request: the page is fetched once and the
@@ -428,10 +506,6 @@ def _run(argv: list[str] | None) -> int:
         print("The chain went deeper than the interpreter allows. "
               "Try a smaller --depth.", file=sys.stderr)
         return EXIT_ERROR
-    finally:
-        closing = getattr(source, "close", None)
-        if closing is not None:
-            closing()
 
     start = result.start
     # The starting word led nowhere. Where there is nothing to draw, a one-line

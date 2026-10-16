@@ -441,3 +441,98 @@ class TestJsonIsAlwaysEmitted:
         assert payload["tree"]["terminal"]["linguistic"] is False
         # The human-facing diagnosis is not lost, it is on the other stream.
         assert "records no etymology" in err
+
+
+class TestInteractiveSession:
+    """`etimo`, no word, at a terminal: look up several words, one process.
+
+    Piped or scripted invocations never see this — same fixture, but
+    `_interactive` stays false, which is `test_no_word_given`'s path.
+    """
+
+    def test_a_word_is_resolved_like_a_single_shot_run(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(["fuoco", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, _ = run(capsys)
+
+        assert code == cli.EXIT_OK
+        assert "focus" in out
+
+    def test_several_words_in_one_session(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(["fuoco", "allogliato", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, _ = run(capsys)
+
+        assert code == cli.EXIT_OK
+        assert "fuoco (it)" in out
+        assert "allogliato (it)" in out
+
+    def test_quitting_straight_away_does_no_lookup(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        monkeypatch.setattr("builtins.input", lambda _prompt: "q")
+
+        code, out, _ = run(capsys)
+
+        assert code == cli.EXIT_OK
+        assert "fuoco" not in out
+
+    def test_eof_leaves_as_cleanly_as_quitting(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+
+        def give_up(_prompt):
+            raise EOFError
+
+        monkeypatch.setattr("builtins.input", give_up)
+
+        code, _, _ = run(capsys)
+
+        assert code == cli.EXIT_OK
+
+    def test_blank_lines_are_not_a_lookup(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(["", "   ", "fuoco", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, _ = run(capsys)
+
+        assert code == cli.EXIT_OK
+        assert "focus" in out
+
+    def test_launch_settings_apply_to_every_word(self, capsys, monkeypatch):
+        """No per-line flags: `--chain` at launch holds for the whole session."""
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(["fuoco", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, _ = run(capsys, "--chain")
+
+        assert code == cli.EXIT_OK
+        assert "←" in out
+        assert "└─" not in out
+
+    def test_a_failed_lookup_does_not_end_the_session(self, capsys, monkeypatch):
+        pages = {"fuoco": "==Italian==\n\n===Etymology===\nFrom {{inh|it|la|focus}}.\n"}
+
+        class FlakyThenFine:
+            requests_made = 0
+
+            def wikitext(self, title):
+                if title == "guasto":
+                    raise SourceError("connection refused")
+                return pages.get(title)
+
+        monkeypatch.setattr(cli, "WiktionaryClient", lambda **_kwargs: FlakyThenFine())
+        monkeypatch.setattr(cli, "DiskCache", lambda source, **_kwargs: source)
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(["guasto", "fuoco", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, err = run(capsys)
+
+        assert code == cli.EXIT_OK
+        assert "reach" in err.lower()
+        assert "focus" in out

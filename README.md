@@ -38,6 +38,7 @@ short, and the tree continues beyond what is shown.
 
 - [Synopsis](#synopsis)
 - [Installation](#installation)
+- [Interactive mode](#interactive-mode)
 - [Description](#description)
 - [Relations](#relations)
 - [Terminals](#terminals)
@@ -99,6 +100,37 @@ uv pip install -e ".[dev]"
 One runtime dependency: `mwparserfromhell`, the library Wikimedia uses to parse
 its own pages. Networking, interface and formatting use the standard library
 only.
+
+---
+
+## Interactive mode
+
+Run `etimo` with no word, at a terminal, and it opens a loop instead of
+refusing: type a word, read its tree, type another, `q` (or `quit`, `exit`,
+Ctrl-D) to leave.
+
+```text
+etimo — a word's history, root by root
+Type a word to trace its history. q, quit, or Ctrl-D to leave.
+
+etimo> caffè
+caffè (it)
+  ← قهوه (ota) [kahve]  borrowed from Ottoman Turkish
+  ← قَهْوَة (ar)  borrowed from Arabic
+  ← ? etymology not interpreted
+
+etimo> q
+```
+
+Flags given at launch — `--chain` above, or `--depth`, `--language`,
+`--no-color`, the cache options — hold for every word in the session; there
+is no per-line flag syntax, on purpose: a second place where a flag could
+mean something slightly different would be worse than not having the loop at
+all. A page already fetched for one word is still in the cache for the next.
+
+Piped or scripted invocations never see this — it needs a terminal on both
+ends, the same condition that governs the sense- and pointer-choice prompts
+under [Ambiguity and pointers](#ambiguity-and-pointers).
 
 ---
 
