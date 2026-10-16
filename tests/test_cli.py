@@ -441,3 +441,171 @@ class TestJsonIsAlwaysEmitted:
         assert payload["tree"]["terminal"]["linguistic"] is False
         # The human-facing diagnosis is not lost, it is on the other stream.
         assert "records no etymology" in err
+
+
+class TestInteractiveSession:
+    """`etimo`, no word, at a terminal: look up several words, one process.
+
+    Piped or scripted invocations never see this — same fixture, but
+    `_interactive` stays false, which is `test_no_word_given`'s path.
+    """
+
+    def test_a_word_is_resolved_like_a_single_shot_run(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(["fuoco", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, _ = run(capsys)
+
+        assert code == cli.EXIT_OK
+        assert "focus" in out
+
+    def test_several_words_in_one_session(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(["fuoco", "allogliato", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, _ = run(capsys)
+
+        assert code == cli.EXIT_OK
+        assert "fuoco (it)" in out
+        assert "allogliato (it)" in out
+
+    def test_quitting_straight_away_does_no_lookup(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        monkeypatch.setattr("builtins.input", lambda _prompt: "q")
+
+        code, out, _ = run(capsys)
+
+        assert code == cli.EXIT_OK
+        assert "fuoco" not in out
+
+    def test_eof_leaves_as_cleanly_as_quitting(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+
+        def give_up(_prompt):
+            raise EOFError
+
+        monkeypatch.setattr("builtins.input", give_up)
+
+        code, _, _ = run(capsys)
+
+        assert code == cli.EXIT_OK
+
+    def test_blank_lines_are_not_a_lookup(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(["", "   ", "fuoco", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, _ = run(capsys)
+
+        assert code == cli.EXIT_OK
+        assert "focus" in out
+
+    def test_launch_settings_apply_to_a_word_given_bare(self, capsys, monkeypatch):
+        """`--chain` at launch is the session default: a bare word inherits it."""
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(["fuoco", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, _ = run(capsys, "--chain")
+
+        assert code == cli.EXIT_OK
+        assert "←" in out
+        assert "└─" not in out
+
+    def test_a_flag_typed_inline_applies_to_that_word(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(["fuoco --chain", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, _ = run(capsys)  # launched plain: no --chain at the top
+
+        assert code == cli.EXIT_OK
+        assert "←" in out
+        assert "└─" not in out
+
+    def test_an_inline_flag_overrides_the_session_default(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(["fuoco --json", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, _ = run(capsys, "--chain")  # session default is chain view
+
+        assert code == cli.EXIT_OK
+        assert json.loads(out)["word"] == "fuoco"
+
+    def test_an_inline_flag_does_not_outlive_its_word(self, capsys, monkeypatch):
+        """`--json` on one line must not leak into the next word's view."""
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(["fuoco --json", "allogliato", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, _ = run(capsys)
+
+        assert code == cli.EXIT_OK
+        assert "allogliato (it)" in out, "the tree view, not a second JSON object"
+
+    def test_an_inline_language_is_honoured(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(["focus --language la --json", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, _ = run(capsys)
+
+        assert code == cli.EXIT_OK
+        assert json.loads(out)["tree"]["language"] == "la"
+
+    def test_a_bad_flag_does_not_end_the_session(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(["fuoco --not-a-real-flag", "fuoco", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, _ = run(capsys)
+
+        assert code == cli.EXIT_OK
+        assert "focus" in out
+
+    def test_unbalanced_quoting_does_not_end_the_session(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(['fuoco "', "fuoco", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, err = run(capsys)
+
+        assert code == cli.EXIT_OK
+        assert "could not parse" in err.lower()
+        assert "focus" in out
+
+    def test_the_banner_recalls_the_mark(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        monkeypatch.setattr("builtins.input", lambda _prompt: "q")
+
+        _, out, err = run(capsys)
+
+        assert "√" in err
+        assert "etimo" in err
+        assert out == "", "decoration is not tree data; stdout stays clean"
+
+    def test_a_failed_lookup_does_not_end_the_session(self, capsys, monkeypatch):
+        pages = {"fuoco": "==Italian==\n\n===Etymology===\nFrom {{inh|it|la|focus}}.\n"}
+
+        class FlakyThenFine:
+            requests_made = 0
+
+            def wikitext(self, title):
+                if title == "guasto":
+                    raise SourceError("connection refused")
+                return pages.get(title)
+
+        monkeypatch.setattr(cli, "WiktionaryClient", lambda **_kwargs: FlakyThenFine())
+        monkeypatch.setattr(cli, "DiskCache", lambda source, **_kwargs: source)
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(["guasto", "fuoco", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, err = run(capsys)
+
+        assert code == cli.EXIT_OK
+        assert "reach" in err.lower()
+        assert "focus" in out
