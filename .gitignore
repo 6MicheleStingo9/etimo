@@ -24,3 +24,7 @@ coverage.json
 # The ledger and the corpus snapshot are *not* here: those are state the
 # workflow is meant to carry forward, and they live on the validation branch.
 artifacts/
+
+# Brand working files (mascot source, generation script, social preview).
+# Kept local on purpose, not versioned.
+brand/

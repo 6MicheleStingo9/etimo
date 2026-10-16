@@ -1,4 +1,4 @@
-# etimo
+<img src="docs/logo/etimo-social.png" alt="etimo — a word's history, root by root" width="100%">
 
 A command-line tool that traces the recorded history of an Italian word through
 Wiktionary, ancestor by ancestor, until the chain reaches a terminal.
