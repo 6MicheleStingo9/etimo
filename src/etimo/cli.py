@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import shlex
 import sys
 from collections.abc import Callable
 
@@ -49,7 +50,12 @@ EXIT_UNREACHABLE = 4
 MAX_DEPTH_ALLOWED = 100
 
 
-def _arguments(argv: list[str] | None = None) -> argparse.Namespace:
+def _arguments(
+    argv: list[str] | None = None, defaults: dict[str, object] | None = None
+) -> argparse.Namespace:
+    """Parse one command line. `defaults` overrides argparse's own defaults —
+    how the interactive loop lets a word's flags start from the session's
+    launch options instead of from scratch."""
     parser = argparse.ArgumentParser(
         prog="etimo",
         description=_DESCRIPTION,
@@ -152,6 +158,9 @@ def _arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "-V", "--version", action="version", version=f"etimo {__version__}"
     )
+
+    if defaults:
+        parser.set_defaults(**defaults)
 
     parsed = parser.parse_args(argv)
     # `--sense` given explicitly means "do not ask me": telling that apart from
@@ -357,13 +366,32 @@ def _run(argv: list[str] | None) -> int:
             closing()
 
 
+# Flags for argparse's own mutually-exclusive group. When neither is on a
+# line, the session's view mode carries over; when either is, the line's own
+# choice must stand alone, or carrying over the other half would make both
+# true at once — a thing the single-shot command line can never produce.
+_VIEW_FLAGS = frozenset({"-c", "--chain", "-j", "--json"})
+
+
+def _banner(style: Style) -> None:
+    """Session decoration, not output: goes to stderr, same as the prompts."""
+    badge = style.brand_badge(" √ ")
+    title = style.brand("etimo")
+    tagline = style.dim(" — a word's history, root by root")
+    print(f"{badge} {title}{tagline}", file=sys.stderr)
+    print(
+        style.dim("Type a word to trace its history. q, quit, or Ctrl-D to leave.\n"),
+        file=sys.stderr,
+    )
+
+
 def _repl(options: argparse.Namespace, warn: Callable[[str], None]) -> int:
     """Look up several words without relaunching the command.
 
-    Settings given at launch — depth, language, chain/json, colour, cache —
-    hold for every word typed here; there is no per-line flag parsing. That
-    keeps this loop from becoming a second, drifting definition of what each
-    flag means, next to the single-shot command line.
+    Each line is parsed like its own command line, starting from the launch
+    options as defaults: a bare word reuses them as they were given, and any
+    flag on the line overrides them for that word alone. Nothing persists
+    from one line to the next beyond what was true at launch.
     """
     error = _validate(options)
     if error:
@@ -374,38 +402,60 @@ def _repl(options: argparse.Namespace, warn: Callable[[str], None]) -> int:
     if not options.no_cache:
         source = DiskCache(source, ttl_days=options.cache_ttl, warn=warn)
 
-    reconstructor = Reconstructor(
-        source,
-        max_depth=options.depth,
-        follow_compounds=not options.no_compounds,
-    )
     style = Style(enabled=not options.no_color)
+    _banner(style)
 
-    print(style.lemma("etimo") + style.dim(" — a word's history, root by root"))
-    print(style.dim("Type a word to trace its history. q, quit, or Ctrl-D to leave.\n"))
+    session = {
+        "language": options.language,
+        "depth": options.depth,
+        "no_compounds": options.no_compounds,
+        "chain_view": options.chain_view,
+        "json_output": options.json_output,
+    }
 
     try:
         while True:
             try:
-                word = input(style.dim("etimo> ")).strip()
+                line = input(style.dim("etimo> ")).strip()
             except (EOFError, KeyboardInterrupt):
                 print(file=sys.stderr)
                 return EXIT_OK
 
-            if not word:
+            if not line:
                 continue
-            if word.casefold() in ("q", "quit", "exit"):
+            if line.casefold() in ("q", "quit", "exit"):
                 return EXIT_OK
 
-            # One word per iteration: everything but the word itself is
-            # carried over from the launch options.
-            query = argparse.Namespace(**vars(options))
-            query.word = word
-            query.sense = 1
-            query.sense_given = False
-            query.senses = False
-            query.as_lemma = None
+            try:
+                argv = shlex.split(line)
+            except ValueError as parse_error:
+                print(f"Could not parse that line: {parse_error}", file=sys.stderr)
+                continue
 
+            defaults = dict(session)
+            if _VIEW_FLAGS.intersection(argv):
+                del defaults["chain_view"]
+                del defaults["json_output"]
+
+            try:
+                query = _arguments(argv, defaults=defaults)
+            except SystemExit:
+                # argparse already printed its own usage, error, help or
+                # version text; a typo here should not end the session.
+                continue
+
+            if not query.word:
+                print("Name a word, or q to quit.", file=sys.stderr)
+                continue
+
+            error = _validate(query)
+            if error:
+                print(error, file=sys.stderr)
+                continue
+
+            reconstructor = Reconstructor(
+                source, max_depth=query.depth, follow_compounds=not query.no_compounds
+            )
             _lookup(query, reconstructor, style)
             print(file=sys.stderr)
     finally:

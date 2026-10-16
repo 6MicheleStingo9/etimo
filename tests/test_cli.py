@@ -502,8 +502,8 @@ class TestInteractiveSession:
         assert code == cli.EXIT_OK
         assert "focus" in out
 
-    def test_launch_settings_apply_to_every_word(self, capsys, monkeypatch):
-        """No per-line flags: `--chain` at launch holds for the whole session."""
+    def test_launch_settings_apply_to_a_word_given_bare(self, capsys, monkeypatch):
+        """`--chain` at launch is the session default: a bare word inherits it."""
         monkeypatch.setattr(cli, "_interactive", lambda: True)
         answers = iter(["fuoco", "q"])
         monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
@@ -513,6 +513,79 @@ class TestInteractiveSession:
         assert code == cli.EXIT_OK
         assert "←" in out
         assert "└─" not in out
+
+    def test_a_flag_typed_inline_applies_to_that_word(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(["fuoco --chain", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, _ = run(capsys)  # launched plain: no --chain at the top
+
+        assert code == cli.EXIT_OK
+        assert "←" in out
+        assert "└─" not in out
+
+    def test_an_inline_flag_overrides_the_session_default(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(["fuoco --json", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, _ = run(capsys, "--chain")  # session default is chain view
+
+        assert code == cli.EXIT_OK
+        assert json.loads(out)["word"] == "fuoco"
+
+    def test_an_inline_flag_does_not_outlive_its_word(self, capsys, monkeypatch):
+        """`--json` on one line must not leak into the next word's view."""
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(["fuoco --json", "allogliato", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, _ = run(capsys)
+
+        assert code == cli.EXIT_OK
+        assert "allogliato (it)" in out, "the tree view, not a second JSON object"
+
+    def test_an_inline_language_is_honoured(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(["focus --language la --json", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, _ = run(capsys)
+
+        assert code == cli.EXIT_OK
+        assert json.loads(out)["tree"]["language"] == "la"
+
+    def test_a_bad_flag_does_not_end_the_session(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(["fuoco --not-a-real-flag", "fuoco", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, _ = run(capsys)
+
+        assert code == cli.EXIT_OK
+        assert "focus" in out
+
+    def test_unbalanced_quoting_does_not_end_the_session(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        answers = iter(['fuoco "', "fuoco", "q"])
+        monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+        code, out, err = run(capsys)
+
+        assert code == cli.EXIT_OK
+        assert "could not parse" in err.lower()
+        assert "focus" in out
+
+    def test_the_banner_recalls_the_mark(self, capsys, monkeypatch):
+        monkeypatch.setattr(cli, "_interactive", lambda: True)
+        monkeypatch.setattr("builtins.input", lambda _prompt: "q")
+
+        _, out, err = run(capsys)
+
+        assert "√" in err
+        assert "etimo" in err
+        assert out == "", "decoration is not tree data; stdout stays clean"
 
     def test_a_failed_lookup_does_not_end_the_session(self, capsys, monkeypatch):
         pages = {"fuoco": "==Italian==\n\n===Etymology===\nFrom {{inh|it|la|focus}}.\n"}
