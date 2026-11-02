@@ -38,6 +38,7 @@ short, and the tree continues beyond what is shown.
 
 - [Synopsis](#synopsis)
 - [Installation](#installation)
+- [Interactive mode](#interactive-mode)
 - [Description](#description)
 - [Relations](#relations)
 - [Terminals](#terminals)
@@ -99,6 +100,42 @@ uv pip install -e ".[dev]"
 One runtime dependency: `mwparserfromhell`, the library Wikimedia uses to parse
 its own pages. Networking, interface and formatting use the standard library
 only.
+
+---
+
+## Interactive mode
+
+Run `etimo` with no word, at a terminal, and it opens a loop instead of
+refusing: type a word, read its tree, type another, `q` (or `quit`, `exit`,
+Ctrl-D) to leave.
+
+```text
+ √  etimo — a word's history, root by root
+Type a word to trace its history. q, quit, or Ctrl-D to leave.
+
+etimo> caffè --chain
+caffè (it)
+  ← قهوه (ota) [kahve]  borrowed from Ottoman Turkish
+  ← قَهْوَة (ar)  borrowed from Arabic
+  ← ? etymology not interpreted
+
+2 steps · terminal: etymology not interpreted
+
+etimo> q
+```
+
+A word may carry the same flags as the command line — `--chain` above, or
+`--depth`, `--language`, `--sense`, `--as` — and they apply to that word
+alone. Flags given when `etimo` was launched are the session's starting
+point: a bare word uses them as they were, a flag on the line overrides them
+for that lookup only, and the next bare word is back to how the session
+started. `--no-color` and the cache options are set once, at launch, and hold
+for the whole session regardless of what a line says. A page already fetched
+for one word is still in the cache for the next.
+
+Piped or scripted invocations never see this — it needs a terminal on both
+ends, the same condition that governs the sense- and pointer-choice prompts
+under [Ambiguity and pointers](#ambiguity-and-pointers).
 
 ---
 

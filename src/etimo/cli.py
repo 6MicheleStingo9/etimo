@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import shlex
 import sys
 from collections.abc import Callable
 
@@ -49,7 +50,12 @@ EXIT_UNREACHABLE = 4
 MAX_DEPTH_ALLOWED = 100
 
 
-def _arguments(argv: list[str] | None = None) -> argparse.Namespace:
+def _arguments(
+    argv: list[str] | None = None, defaults: dict[str, object] | None = None
+) -> argparse.Namespace:
+    """Parse one command line. `defaults` overrides argparse's own defaults —
+    how the interactive loop lets a word's flags start from the session's
+    launch options instead of from scratch."""
     parser = argparse.ArgumentParser(
         prog="etimo",
         description=_DESCRIPTION,
@@ -152,6 +158,9 @@ def _arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "-V", "--version", action="version", version=f"etimo {__version__}"
     )
+
+    if defaults:
+        parser.set_defaults(**defaults)
 
     parsed = parser.parse_args(argv)
     # `--sense` given explicitly means "do not ask me": telling that apart from
@@ -279,6 +288,24 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_ERROR
 
 
+def _validate(options: argparse.Namespace) -> str | None:
+    """The checks that must pass before any request is made. None means go ahead."""
+    if not 1 <= options.depth <= MAX_DEPTH_ALLOWED:
+        return f"Depth must be between 1 and {MAX_DEPTH_ALLOWED}."
+
+    if options.cache_ttl < 0:
+        return "The cache lifetime cannot be negative. Use --no-cache to skip it."
+
+    # A wrong language code otherwise surfaces as a generic "no entry", sending
+    # the user to check a spelling that was never the problem.
+    if not is_known_language(options.language):
+        return (
+            f"«{options.language}» is not a language code we know.\n"
+            "Use Wiktionary codes: it (Italian), la (Latin), grc (Ancient Greek)…"
+        )
+    return None
+
+
 def _run(argv: list[str] | None) -> int:
     options = _arguments(argv)
 
@@ -306,27 +333,18 @@ def _run(argv: list[str] | None) -> int:
         return EXIT_OK
 
     if not options.word:
+        # A terminal and nobody named a word: there is somebody to talk to, so
+        # offer the loop instead of a one-line refusal. Piped or scripted
+        # invocations (no tty) get the refusal, as before.
+        if _interactive():
+            return _repl(options, warn)
         print("Name the word to reconstruct. Use --help for the options.",
               file=sys.stderr)
         return EXIT_ERROR
 
-    if not 1 <= options.depth <= MAX_DEPTH_ALLOWED:
-        print(f"Depth must be between 1 and {MAX_DEPTH_ALLOWED}.", file=sys.stderr)
-        return EXIT_ERROR
-
-    if options.cache_ttl < 0:
-        print("The cache lifetime cannot be negative. Use --no-cache to skip it.",
-              file=sys.stderr)
-        return EXIT_ERROR
-
-    # A wrong language code otherwise surfaces as a generic "no entry", sending
-    # the user to check a spelling that was never the problem.
-    if not is_known_language(options.language):
-        print(
-            f"«{options.language}» is not a language code we know.\n"
-            "Use Wiktionary codes: it (Italian), la (Latin), grc (Ancient Greek)…",
-            file=sys.stderr,
-        )
+    error = _validate(options)
+    if error:
+        print(error, file=sys.stderr)
         return EXIT_ERROR
 
     source: WikitextSource = WiktionaryClient(warn=warn)
@@ -340,6 +358,116 @@ def _run(argv: list[str] | None) -> int:
     )
     style = Style(enabled=not options.no_color)
 
+    try:
+        return _lookup(options, reconstructor, style)
+    finally:
+        closing = getattr(source, "close", None)
+        if closing is not None:
+            closing()
+
+
+# Flags for argparse's own mutually-exclusive group. When neither is on a
+# line, the session's view mode carries over; when either is, the line's own
+# choice must stand alone, or carrying over the other half would make both
+# true at once — a thing the single-shot command line can never produce.
+_VIEW_FLAGS = frozenset({"-c", "--chain", "-j", "--json"})
+
+
+def _banner(style: Style) -> None:
+    """Session decoration, not output: goes to stderr, same as the prompts."""
+    badge = style.brand_badge(" √ ")
+    title = style.brand("etimo")
+    tagline = style.dim(" — a word's history, root by root")
+    print(f"{badge} {title}{tagline}", file=sys.stderr)
+    print(
+        style.dim("Type a word to trace its history. q, quit, or Ctrl-D to leave.\n"),
+        file=sys.stderr,
+    )
+
+
+def _repl(options: argparse.Namespace, warn: Callable[[str], None]) -> int:
+    """Look up several words without relaunching the command.
+
+    Each line is parsed like its own command line, starting from the launch
+    options as defaults: a bare word reuses them as they were given, and any
+    flag on the line overrides them for that word alone. Nothing persists
+    from one line to the next beyond what was true at launch.
+    """
+    error = _validate(options)
+    if error:
+        print(error, file=sys.stderr)
+        return EXIT_ERROR
+
+    source: WikitextSource = WiktionaryClient(warn=warn)
+    if not options.no_cache:
+        source = DiskCache(source, ttl_days=options.cache_ttl, warn=warn)
+
+    style = Style(enabled=not options.no_color)
+    _banner(style)
+
+    session = {
+        "language": options.language,
+        "depth": options.depth,
+        "no_compounds": options.no_compounds,
+        "chain_view": options.chain_view,
+        "json_output": options.json_output,
+    }
+
+    try:
+        while True:
+            try:
+                line = input(style.dim("etimo> ")).strip()
+            except (EOFError, KeyboardInterrupt):
+                print(file=sys.stderr)
+                return EXIT_OK
+
+            if not line:
+                continue
+            if line.casefold() in ("q", "quit", "exit"):
+                return EXIT_OK
+
+            try:
+                argv = shlex.split(line)
+            except ValueError as parse_error:
+                print(f"Could not parse that line: {parse_error}", file=sys.stderr)
+                continue
+
+            defaults = dict(session)
+            if _VIEW_FLAGS.intersection(argv):
+                del defaults["chain_view"]
+                del defaults["json_output"]
+
+            try:
+                query = _arguments(argv, defaults=defaults)
+            except SystemExit:
+                # argparse already printed its own usage, error, help or
+                # version text; a typo here should not end the session.
+                continue
+
+            if not query.word:
+                print("Name a word, or q to quit.", file=sys.stderr)
+                continue
+
+            error = _validate(query)
+            if error:
+                print(error, file=sys.stderr)
+                continue
+
+            reconstructor = Reconstructor(
+                source, max_depth=query.depth, follow_compounds=not query.no_compounds
+            )
+            _lookup(query, reconstructor, style)
+            print(file=sys.stderr)
+    finally:
+        closing = getattr(source, "close", None)
+        if closing is not None:
+            closing()
+
+
+def _lookup(
+    options: argparse.Namespace, reconstructor: Reconstructor, style: Style
+) -> int:
+    """Resolve one word and print its chain. The exit code reflects that word alone."""
     try:
         # Which word did they mean? Some spellings cover several unrelated
         # ones. This costs no extra request: the page is fetched once and the
@@ -428,10 +556,6 @@ def _run(argv: list[str] | None) -> int:
         print("The chain went deeper than the interpreter allows. "
               "Try a smaller --depth.", file=sys.stderr)
         return EXIT_ERROR
-    finally:
-        closing = getattr(source, "close", None)
-        if closing is not None:
-            closing()
 
     start = result.start
     # The starting word led nowhere. Where there is nothing to draw, a one-line

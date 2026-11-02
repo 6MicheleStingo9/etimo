@@ -48,6 +48,20 @@ class Style:
     def _paint(self, text: str, code: str) -> str:
         return f"\033[{code}m{text}\033[0m" if self.enabled else text
 
+    # The brand's own green, not one of the roles above: used only by the
+    # interactive banner, which is decoration rather than part of the tree.
+    _VERDE = "48;172;118"
+    _FORESTA = "30;88;56"
+
+    def brand(self, text: str) -> str:
+        return self._paint(text, f"1;38;2;{self._VERDE}")
+
+    def brand_badge(self, text: str) -> str:
+        """Verde on Foresta — the same pairing as the mark, as a text badge."""
+        if not self.enabled:
+            return text
+        return f"\033[1;38;2;{self._VERDE};48;2;{self._FORESTA}m{text}\033[0m"
+
     def lemma(self, text: str) -> str:
         return self._paint(text, "1")
 
