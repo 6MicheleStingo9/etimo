@@ -137,6 +137,9 @@ class TestBranching:
         "phrase, relation",
         [
             ("From", Relation.DERIVED),
+            ("From the personal name", Relation.DERIVED),
+            ("From the rare personal name", Relation.DERIVED),
+            ("From regional", Relation.DERIVED),
             ("Derived from", Relation.DERIVED),
             ("Reformed from", Relation.DERIVED),
             ("Deverbal of", Relation.DEVERBAL),
@@ -187,6 +190,11 @@ class TestBranching:
         [
             "Compare {{m|it|ino}}.",
             "See {{m|it|abbigliare}}.",
+            "From a variant of the personal name {{m|it|Damiano}}.",
+            "From a diminutive form of the personal name {{m|it|Ambrogio}}.",
+            "From a shortened form of the personal name {{m|it|Adeodato}}.",
+            "From the abbreviation {{m|it|AN}}.",
+            "From the suffix {{m|it|-accio}}.",
             "Feminine of {{m|it|alunno}}.",
             "Masculine of {{m|it|alunna}}.",
             "Plural of {{m|it|cane}}.",
@@ -196,6 +204,13 @@ class TestBranching:
     )
     def test_mentions_without_a_derivational_governor_are_not_ancestors(self, sentence):
         assert parse(sentence, "it").steps == []
+
+    def test_interwiki_relation_target_is_not_a_wiktionary_lemma(self):
+        analysis = parse(
+            "{{acronym|en|w:light amplification by stimulated emission of radiation}}",
+            "en",
+        )
+        assert analysis.steps == []
 
     def test_cross_language_bare_from_mention_is_not_assigned_a_relation(self):
         assert parse("From {{m|la|aqua}}.", "it").steps == []

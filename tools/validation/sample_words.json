@@ -53,13 +53,13 @@
     "word": "pizza",
     "language": "it",
     "category": "conditioned-prose",
-    "why": "One asserted chain plus one alternative introduced as a possibility. The alternative must be a conjecture; the chain must survive. NOTE — OVERDETERMINED, like `cavolo` but by a different pair. The entry carries two markers on the same form: «Also **possibly** from {{bor|it|lng|bizza}} (also `pizza` **or** `bizzo`)». Conditioning and alternation each keep `bizza` among the conjectures on their own, so breaking either one leaves this case green. Chronology is indeed silent here — Lombardic above Italian is an ordinary order — but that is not enough to make it a presidium. NO CLEAN PRESIDIUM EXISTS in this seed for conditioning over a *linear* relation, and the reason is in the data, not in the tests: an isolating case would need a modaliser directly before a {{der}}/{{inh}}/{{bor}} that gives a form, with no alternation, a chronologically ordinary ancestor, and a lemma rather than an inflected form. Entries checked and rejected: `banda` (form suppressed with `-`), `dipinto` and `ansa` (inflected forms, resolved to their lemma so the conditioned clause is never walked), `intronare` and `vilucchio` (marker governs a cognate), `strabiliare` (formation template, duplicates `rodomonte`). The half of the rule that actually broke — conditioning over formation templates — is guarded by `rodomonte`.",
+    "why": "The Neapolitan borrowing is asserted. The Greek {{der}} is introduced by «Possibly related to», so it is a hypothesis, not a certain ancestor; the Lombardic {{bor}} is also qualified by «possibly» and coordinated alternatives. The reader must preserve the Neapolitan chain and keep both proposals out of the asserted tree. This case is overdetermined for Lombardic bizza (conditioning and alternation each guard it), but it also guards the distinction between a possible cognate and an asserted ancestor.",
     "manual_review": false,
     "expected": {
       "must_include_relations": ["borrowed"],
-      "must_include_forms": ["pizza::nap", "πίτα::gkm"],
-      "must_include_hypotheses": ["bizza::lng"],
-      "must_not_include_forms": ["bizza::lng"]
+      "must_include_forms": ["pizza::nap"],
+      "must_include_hypotheses": ["πίτα::gkm", "bizza::lng"],
+      "must_not_include_forms": ["πίτα::gkm", "bizza::lng"]
     }
   },
   {
@@ -203,12 +203,13 @@
   {
     "word": "allogliato",
     "language": "it",
-    "category": "declared-limit",
-    "why": "Prose the parser cannot turn into a chain. The terminal must say the limit is ours (`?`), not the language's, and the entry's own words must be printed.",
+    "category": "governed-prose",
+    "why": "The entry says «From {{m|it|loglio}}», an explicit same-language etymology. The reader must turn that licensed mention into a derived link rather than retain a not_interpreted terminal.",
     "manual_review": false,
     "expected": {
-      "must_include_terminals": ["not_interpreted"],
-      "must_not_include_terminals": ["data_exhausted"]
+      "must_include_relations": ["derived"],
+      "must_include_forms": ["loglio::it"],
+      "must_not_include_terminals": ["not_interpreted", "data_exhausted"]
     }
   },
   {

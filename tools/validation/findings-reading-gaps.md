@@ -93,6 +93,60 @@ later network retry are not evidence that they belonged to that original
 class. The 52-entry total and phrase frequencies could not be independently
 reproduced.
 
+### Reproducible residual census — 2026-10-13
+
+I selected candidates from the saved full-corpus survey, not from parser
+tables: at survey commit
+`c6bf4a443119fa682ca1d80fe1fdbb3e04f788de`, the 127,195-row survey has 37
+lemmas whose overall outcome is `unread` (distinct from 153 rows with an
+`unread` terminal somewhere below the root). I fetched those entries again and
+read their displayed `not_interpreted` text, then inspected source markup only
+to classify the already-selected candidates. All 37 were retrievable; 38
+requests were made.
+
+All 37 displayed notes open with **From**. Within them, 20 same-language
+`{{m}}` mentions have an explicit governor. This is the breakdown by governor
+phrase, counted per mention rather than per lemma:
+
+| governor before same-language mention | mentions | entries | treatment |
+| --- | ---: | --- | --- |
+| `From the personal name` | 8 | `Agati`, `Alberti`, `Achilli`, `Alvisi`, `Aldighieri`, `Alessi`, `Agostini`, `Algisi` | direct, different lexical name; read as a link |
+| `From the rare personal name` | 1 | `Altobelli` | direct, different lexical name; read as a link |
+| `From regional` | 1 | `abbioccare` | direct lexical source; read as a link |
+| `From a variant of the personal name` | 2 | `Addamiano`, `Addamo` | the named form is an unspecified variant; do not link directly to the base |
+| `From a diminutive form of the personal name` | 1 | `Ambrosini` | the intermediate diminutive is unnamed; do not skip it |
+| `From a shortened form of the personal name` | 1 | `Addeo` | the shortened form is unnamed; do not skip it |
+| `From the abbreviation` | 1 | `aennino` | acronym/abbreviation class; not promoted by this reader |
+| `From an infix` | 1 | `-onzolo` | affix components, not lexical ancestors |
+| `From the suffix` | 1 | `accio` | an affix, not a lexical ancestor |
+| `From earlier` | 1 | `il` (survey candidate `'l` resolves to `il`) | same-lexeme form; do not draw an ancestor edge |
+| `a reduced form of` | 1 | `il` (same note as above) | same-lexeme form; do not draw an ancestor edge |
+| `From` with competing alternatives | 2 | `Alfieri`, `allotropico` | a single mention is not asserted across alternatives |
+| **Total** | **21** | | |
+
+The ten direct links are `Agati`, `Alberti`, `Achilli`, `Alvisi`,
+`Aldighieri`, `Alessi`, `Agostini`, `Algisi`, `Altobelli`, and `abbioccare`.
+The other 17 candidate entries have no same-language mention licensed as a direct
+lexical ancestor: they are cross-language origins, prose without such a
+mention, or a phrase-level/narrative explanation. Rechecking all 37 with the
+reader after the change linked the ten direct cases above; 27 remain
+`not_interpreted`, including the ten governed mentions that must not be
+promoted automatically (11 mentions across those entries).
+
+The 25 independent live expectation seeds then passed with zero failures.
+Their previous mismatches were stale expectations: `allogliato` now reads
+`From {{m|it|loglio}}` as a link, and `pizza`'s «Possibly related to
+`πίτα`» is correctly a hypothesis rather than an asserted form.
+
+This is a current residual census, not a recreation of the original 52-item
+alphabetical inventory and not a frequency estimate for every successful
+derivation in Wiktionary. The survey does not retain source text for already
+read links, so it cannot answer the latter question. The old 52 and 40.6%
+remain historical and unreproducible. Same-lexeme traversal of the `il` note
+is still open: the reader correctly refrains from drawing an ancestor edge,
+but this census did not establish that it follows the alternate-form mention
+to the full form's chain.
+
 ```
 absidiola      From {{m|it|abside}}.
 affondatoio    From {{m|it|affondare}}.
