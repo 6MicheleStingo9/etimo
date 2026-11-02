@@ -161,6 +161,11 @@ _WORD_FORMATION_RELATIONS: dict[str, Relation] = {
 # mention as an etymon. Inflection and spelling pointers are deliberately absent
 # because they name another form of the same lexeme.
 _PROSE_RELATIONS: tuple[tuple[re.Pattern[str], Relation], ...] = (
+    (
+        re.compile(r"\bfrom\s+the\s+(?:rare\s+)?personal name\s*$", re.I),
+        Relation.DERIVED,
+    ),
+    (re.compile(r"\bfrom\s+regional\s*$", re.I), Relation.DERIVED),
     (re.compile(r"\bfrom\s+(?:(?:a|an|the)\s+)?$", re.I), Relation.DERIVED),
     (
         re.compile(r"\bderived\s+from\s+(?:(?:a|an|the)\s+)?$", re.I),
@@ -871,11 +876,31 @@ def _form_from_relation(tpl: Template) -> Form | None:
     language, 3 lemma, 4 display form, 5 translation. The translation also
     appears as `t=` or `gloss=`.
     """
-    language = _param(tpl, "2")
+    name = _normalize_name(tpl.name)
+    if name in {
+        "abbreviation",
+        "abbrev",
+        "abbreviation of",
+        "acronym",
+        "acro",
+        "acronym of",
+        "initialism",
+        "init",
+        "initialism of",
+        "syllabic abbreviation",
+        "sylabbr",
+    }:
+        # Abbreviation templates use the entry language followed by the
+        # expansion, unlike derivational templates whose second parameter is
+        # the source language.
+        language = _param(tpl, "1")
+        lemma = _param(tpl, "2")
+    else:
+        language = _param(tpl, "2")
+        lemma = _param(tpl, "3")
     if not language:
         return None
 
-    lemma = _param(tpl, "3")
     # The hyphen is the convention for "no form cited".
     if lemma == "-":
         lemma = ""
@@ -899,6 +924,12 @@ def _form_from_relation(tpl: Template) -> Form | None:
     lemma, *variants = [part.strip() for part in lemma.split(",") if part.strip()] or [
         ""
     ]
+    # An interwiki target belongs to another Wikimedia project, not to
+    # Wiktionary. Following it would turn an external explanation such as
+    # `{{acronym|en|w:light amplification by stimulated emission of radiation}}`
+    # into a false missing entry and leave the `w:` prefix in the lemma.
+    if _is_external_target(lemma):
+        return None
 
     return Form(
         lemma=lemma,
@@ -946,6 +977,11 @@ _NO_LANGUAGE_PARAMETER = {
 }
 
 
+def _is_external_target(lemma: str) -> bool:
+    """Return whether a target points to another Wikimedia project."""
+    return lemma.casefold().startswith(("w:", "wikipedia:", "wiktionary:"))
+
+
 def _forms_from_word_formation(tpl: Template, entry_language: str) -> list[Form]:
     """Extract the components of a compound or affixal derivation.
 
@@ -986,6 +1022,8 @@ def _forms_from_word_formation(tpl: Template, entry_language: str) -> list[Form]
         if not value:
             value = annotations.get("alt", "")
         if not value:
+            continue
+        if _is_external_target(value):
             continue
 
         position = index - first

@@ -73,10 +73,11 @@ at all, because B is a comparison and was never a candidate ancestor.
 
 `{{m}}` names a form; by itself it makes no claim about the form's relation to
 the entry. When an explicit same-language phrase immediately governs it —
-«From», «Derived from», «Reformed from», or «Deverbal of» — the mention can
-supply the form for that stated relation. For example, «From `{{m|it|abside}}`»
-licenses a derivation, while «Compare `{{m|it|ino}}`» and «See
-`{{m|it|abbigliare}}`» do not.
+«From», «From the personal name», «From regional», «Derived from»,
+«Reformed from», or «Deverbal of» — the mention can supply the form for that
+stated relation. For example, «From `{{m|it|abside}}`» and «From the personal
+name `{{m|it|Agata}}`» license a derivation, while «Compare `{{m|it|ino}}`»
+and «See `{{m|it|abbigliare}}`» do not.
 
 The phrase must also name a different lexeme. «Feminine of», «Plural of»,
 «Past participle of» and spelling-variant phrases describe another form of the
@@ -86,6 +87,12 @@ precede a mention. A qualifier such as «Probably» still governs the relation:
 link. When a plus sign joins governed mentions («From
 `{{m|it|acqua}}` + `{{m|it|ragia}}`»), both forms are components of the same
 compound.
+
+Modifiers that leave an unnamed intermediate form are not treated as a direct
+link: «From a variant of the personal name `{{m|it|Damiano}}`» names the base
+name, not the variant, and «From a shortened form of the personal name
+`{{m|it|Adeodato}}`» does not give the shortened form. An abbreviation or an
+affix named as an origin is likewise not promoted by the word «From» alone.
 
 ### The shared component of competing analyses is not in competition
 
