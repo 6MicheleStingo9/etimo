@@ -104,9 +104,12 @@ read their displayed `not_interpreted` text, then inspected source markup only
 to classify the already-selected candidates. All 37 were retrievable; 38
 requests were made.
 
-All 37 displayed notes open with **From**. Within them, 20 same-language
+All 37 displayed notes open with **From**. Within them, 21 same-language
 `{{m}}` mentions have an explicit governor. This is the breakdown by governor
-phrase, counted per mention rather than per lemma:
+phrase, counted per mention rather than per lemma. The denominator is 37
+candidate roots and 21 governed mentions; percentages of the latter are 38.1%
+for the eight-item row, 9.5% for the two-item rows, and 4.8% for each
+one-item row:
 
 | governor before same-language mention | mentions | entries | treatment |
 | --- | ---: | --- | --- |
@@ -130,8 +133,8 @@ The other 17 candidate entries have no same-language mention licensed as a direc
 lexical ancestor: they are cross-language origins, prose without such a
 mention, or a phrase-level/narrative explanation. Rechecking all 37 with the
 reader after the change linked the ten direct cases above; 27 remain
-`not_interpreted`, including the ten governed mentions that must not be
-promoted automatically (11 mentions across those entries).
+`not_interpreted`, including the eleven governed mentions that must not be
+promoted automatically.
 
 The 25 independent live expectation seeds then passed with zero failures.
 Their previous mismatches were stale expectations: `allogliato` now reads

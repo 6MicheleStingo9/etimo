@@ -504,6 +504,19 @@ class TestDefinitionLineStatements:
         assert result.resolved
         assert result.start.form.lemma == "televisione"
 
+    def test_alternative_form_is_resolved_without_becoming_an_ancestor(self):
+        source = DictSource(
+            {
+                "'l": self.page("{{alternative form of|it|il}}"),
+                "il": entry("Italian", "Of uncertain origin."),
+            }
+        )
+        result = Reconstructor(source).reconstruct("'l")
+        assert result.resolved
+        assert result.asked_for.lemma == "'l"
+        assert result.start.form.lemma == "il"
+        assert result.start.children == []
+
     def test_an_entry_with_its_own_etymology_is_not_overridden(self):
         page = (
             "==Italian==\n\n===Etymology===\nFrom {{inh|it|la|tubus}}.\n\n"
