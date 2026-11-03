@@ -137,6 +137,13 @@ class TestBranching:
         analysis = parse("{{af|it|auto-|la:mobilis}}", "it")
         assert [f.language for f in analysis.steps[0].forms] == ["it", "la"]
 
+    def test_interwiki_relation_target_is_not_a_wiktionary_lemma(self):
+        analysis = parse(
+            "{{acronym|en|w:light amplification by stimulated emission of radiation}}",
+            "en",
+        )
+        assert analysis.steps == []
+
 
 class TestUncertaintyAndHypotheses:
     def test_uncertainty_template(self):
