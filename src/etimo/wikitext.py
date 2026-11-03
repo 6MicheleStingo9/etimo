@@ -829,11 +829,28 @@ def _form_from_relation(tpl: Template) -> Form | None:
     language, 3 lemma, 4 display form, 5 translation. The translation also
     appears as `t=` or `gloss=`.
     """
-    language = _param(tpl, "2")
+    name = _normalize_name(tpl.name)
+    if name in {
+        "abbreviation",
+        "abbrev",
+        "abbreviation of",
+        "acronym",
+        "acro",
+        "acronym of",
+        "initialism",
+        "init",
+        "initialism of",
+        "syllabic abbreviation",
+        "sylabbr",
+    }:
+        language = _param(tpl, "1")
+        lemma = _param(tpl, "2")
+    else:
+        language = _param(tpl, "2")
+        lemma = _param(tpl, "3")
     if not language:
         return None
 
-    lemma = _param(tpl, "3")
     # The hyphen is the convention for "no form cited".
     if lemma == "-":
         lemma = ""
@@ -857,6 +874,8 @@ def _form_from_relation(tpl: Template) -> Form | None:
     lemma, *variants = [part.strip() for part in lemma.split(",") if part.strip()] or [
         ""
     ]
+    if _is_external_target(lemma):
+        return None
 
     return Form(
         lemma=lemma,
@@ -873,6 +892,11 @@ def _form_from_relation(tpl: Template) -> Form | None:
             _first_available(tpl, "tr") or annotations.get("tr") or None
         ),
     )
+
+
+def _is_external_target(lemma: str) -> bool:
+    """Return whether a target points to another Wikimedia project."""
+    return lemma.casefold().startswith(("w:", "wikipedia:", "wiktionary:"))
 
 
 # Language-specific templates carry no language parameter — `{{it-deverbal|x}}`,
@@ -923,6 +947,8 @@ def _forms_from_word_formation(tpl: Template, entry_language: str) -> list[Form]
         if not value:
             value = annotations.get("alt", "")
         if not value:
+            continue
+        if _is_external_target(value):
             continue
 
         position = index - first
