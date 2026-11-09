@@ -1724,6 +1724,11 @@ def _structured_form(chunk: str, default_language: str) -> Form | None:
     if not lemma:
         return None
 
+    reconstructed = lemma.startswith("*")
+    lemma = _clean_target(lemma)
+    if reconstructed and lemma and not lemma.startswith("*"):
+        lemma = f"*{lemma}"
+
     return Form(
         lemma=lemma,
         language=language,
