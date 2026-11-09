@@ -271,6 +271,22 @@ class TestStructuredFormat:
         analysis = parse("{{etymon|grc|:der|ira-pro:<alt:*wrinǰiš><id:rice>}}", "grc")
         assert analysis.steps[0].forms[0].lemma == "*wrinǰiš"
 
+    def test_wikilinks_are_removed_from_structured_lemmas(self):
+        analysis = parse(
+            "{{ety|la|:clip|[[prōsa]] [[ōrātiō]]|[[prōsa]] [[ēloquentia]]}}",
+            "la",
+        )
+        assert [form.lemma for form in analysis.steps[0].forms] == [
+            "prōsa ōrātiō",
+            "prōsa ēloquentia",
+        ]
+
+    def test_structured_wikilink_cleanup_preserves_reconstructed_marker(self):
+        analysis = parse("{{ety|la|:inh|*[[prōsa]]}}", "la")
+        form = analysis.steps[0].forms[0]
+        assert form.lemma == "*prōsa"
+        assert form.reconstructed
+
     def test_nesting_does_not_confuse_the_first_level(self):
         # The `<ety:…>` continuation is ignored: we rebuild it by walking up to
         # the ancestor's entry, where the data is first-hand.
