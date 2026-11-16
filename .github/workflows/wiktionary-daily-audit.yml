@@ -15,10 +15,10 @@ on:
     inputs:
       batch_size:
         description: >-
-          Maximum number of validation cases to process. The default of 300
+          Maximum number of validation cases to process. The default of 500
           advances corpus coverage while retaining the fixed expectation suite.
         required: false
-        default: "300"
+        default: "500"
         type: string
       rebuild_corpus:
         description: >-
@@ -120,7 +120,7 @@ jobs:
           python tools/validate_wiktionary.py \
             --seed-file "$CORPUS_FILE" \
             --queue-file "$LEDGER_FILE" \
-            --batch-size "${{ inputs.batch_size || '300' }}" \
+            --batch-size "${{ inputs.batch_size || '500' }}" \
             --output-dir artifacts/wiktionary-validation \
             --rate-limit-delay 0.5 \
             --summary-md "$GITHUB_STEP_SUMMARY"
