@@ -1012,7 +1012,7 @@ def _forms_from_word_formation(tpl: Template, entry_language: str) -> list[Form]
         language = _param(tpl, f"lang{index - first}") or default_language
         if ":" in value:
             candidate, rest = value.split(":", 1)
-            if is_known_language(candidate):
+            if _LANGUAGE_CODE.fullmatch(candidate):
                 language, value = candidate, rest
 
         # Components may carry inline annotations — `pós<t:afterwards>` — which

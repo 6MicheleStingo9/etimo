@@ -219,6 +219,14 @@ class TestBranching:
         analysis = parse("{{af|it|auto-|la:mobilis}}", "it")
         assert [f.language for f in analysis.steps[0].forms] == ["it", "la"]
 
+    def test_unknown_multisubtag_component_language_is_split_from_lemma(self):
+        analysis = parse("{{af|grc|Μοῦσα|grc-dor:ἀγέτης}}", "grc")
+        forms = analysis.steps[0].forms
+        assert [(form.language, form.lemma) for form in forms] == [
+            ("grc", "Μοῦσα"),
+            ("grc-dor", "ἀγέτης"),
+        ]
+
 
 class TestUncertaintyAndHypotheses:
     def test_uncertainty_template(self):
