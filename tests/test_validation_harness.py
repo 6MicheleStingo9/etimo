@@ -248,6 +248,15 @@ def test_fidelity_invariant_i2_language_prefix_detected():
     assert any("I2 language prefix" in v for v in violations)
 
 
+def test_fidelity_invariant_i2_accepts_internal_colon_in_lemma():
+    internal_colon_node = Node(
+        form=Form(lemma="xwé:wamənk", language="umu"),
+        relation=Relation.DERIVED,
+    )
+    violations = _verify_fidelity_invariants(internal_colon_node)
+    assert not any("I2 language prefix" in v for v in violations)
+
+
 def test_fidelity_invariant_i3_impossible_chronology_detected():
     parent_node = Node(form=Form(lemma="caulis", language="la-lat"))
     child_node = Node(
