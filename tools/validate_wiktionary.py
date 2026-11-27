@@ -928,6 +928,7 @@ def _extract_tree_facts(root: Node) -> dict[str, Any]:
 def _verify_fidelity_invariants(root: Node) -> list[str]:
     """Universal structural fidelity checks (from test_fidelity_checks.py)."""
     violations: list[str] = []
+    language_code = re.compile(r"[a-z]{2,3}(?:-[a-z]{2,4})?")
 
     for node in _every_node(root):
         lemma = node.form.lemma or ""
@@ -936,8 +937,11 @@ def _verify_fidelity_invariants(root: Node) -> list[str]:
         if re.search(r"[<>]|\[\[|\]\]|::", lemma):
             violations.append(f"I1 markup corruption in lemma: «{lemma}»")
 
-        # I2: No un-split language prefix in lemma (e.g. pgd:lemma)
-        if ":" in lemma:
+        # I2: no un-split code-shaped language prefix in lemma (e.g.
+        # pgd:lemma). A colon in the name itself, such as xwé:wamənk, is not
+        # evidence of an omitted language prefix.
+        candidate = lemma.partition(":")[0]
+        if ":" in lemma and language_code.fullmatch(candidate):
             violations.append(f"I2 language prefix not split in lemma: «{lemma}»")
 
         # I3: Chronological order sanity
